@@ -10,3 +10,5 @@ pwdists/output_obsobs/*
 pwdists/output_predsobs/*
 pwdists/R_outfiles/*
 bench_results/*
+lsn/*
+validateS3N.ssn/*
