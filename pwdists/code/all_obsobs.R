@@ -15,13 +15,14 @@ m = as.numeric(args[1])
 
 # assumes this script is in a subfolder of the directory containing the other folders
 base_dir = getwd()
+print(base_dir)
 out_dir = paste0(base_dir, "/output_obsobs/")
 data_dir = paste0(base_dir, "/input/")
-code_dir = paste0(base_dir, "/code/")
+print(data_dir)
 
-source(paste0(base_dir, "/../preprocessing_code/S3N_functions.R"))
+source(paste0(base_dir, "/../S3N_functions.R"))
 
-load(paste0(data_dir,"preds_obs_pwdist_input_data.RData"))
+load(paste0(data_dir, "preds_obs_pwdist_input_data.RData"))
 
 compute_pwdists_pred_obs(obs, obs, streams, m, out_dir, obs_only = TRUE)
 

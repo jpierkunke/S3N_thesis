@@ -19,15 +19,12 @@ cat(paste("Batch ID", batch_id, "with batch size", batch_size,
           "and", m, "neighbors per preds point"), fill=TRUE)
 
 # assumes this script is in a subfolder of the directory containing the other folders
-base_dir = getwd() #"cluster_pwdists"
-# cat(base_dir, fill=TRUE)
+base_dir = getwd()
+cat(base_dir, fill=TRUE)
 out_dir = paste0(base_dir, "/output_predsobs/")
 data_dir = paste0(base_dir, "/input/")
-code_dir = paste0(base_dir, "/code/")
-# cat(paste("Code directory:", code_dir), fill=TRUE)
 
-source(paste0(base_dir, "/../preprocessing_code/S3N_functions.R"))
-# source("~/BRISC_fish/preprocessing_code/points_functions.R")
+source(paste0(base_dir, "/../S3N_functions.R"))
 
 # first compute the pairwise distances --------------------------------------#
 

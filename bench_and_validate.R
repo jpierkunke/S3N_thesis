@@ -49,7 +49,7 @@ load(paste0(data_path, "streams_region5.rda"))
 streams_full = streams
 # set lsn file path and output path for benchmark/validation results
 lsn.path = "lsn"
-bench_res_dir = "bench_res/"
+bench_res_dir = "bench_results/"
 
 bench_nws = data.frame(
   Network = 1:6,

@@ -16,12 +16,13 @@ m = as.numeric(args[2])
 
 # assumes this script is in a subfolder of the directory containing the other folders
 base_dir = getwd()
+cat("base_dir", fill=TRUE)
 # location of obs neighbors for prediction (an input to this script)
 obs_dir = paste0(base_dir, "/output_obsobs/")
 # location to write combined preds neighbors (output from this script)
 out_dir = paste0(base_dir, "/output_predsobs/")
 
-source(paste0(base_dir, "/../preprocessing_code/S3N_functions.R"))
+source(paste0(base_dir, "/../S3N_functions.R"))
 
 cat("Combine preds-obs nearest neighbor results", fill = TRUE)
 combine_preds_nn_results(
