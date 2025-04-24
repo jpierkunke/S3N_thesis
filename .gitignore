@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+*.Rproj
+input_data/*
+pwdists/input/*
+pwdists/output_obsobs/*
+pwdists/output_predsobs/*
+pwdists/R_outfiles/*
+bench_results/*
