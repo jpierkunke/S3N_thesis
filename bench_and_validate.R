@@ -53,8 +53,8 @@ bench_res_dir = "bench_results/"
 
 bench_nws = data.frame(
   Network = 1:6,
-  nreps_S3N = c(50, 50, 50, 10, 10, 10),
-  nreps_SSN = c(50, 50, 50, 10, 2, NA)
+  nreps_S3N = c(50, 50, 50, 10,  2,  2),
+  nreps_SSN = c(50, 50,  5,  1,  1, NA) # for SSN network 5, do preprocessing only, no estimation
 )
 
 
@@ -91,6 +91,11 @@ benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[4], 
                        bench_nws$nreps_S3N[4], 
                        bench_nws$nreps_SSN[4])
+# S3N: R session takes <=2 GB memory throughout, 
+#      obs-obs distances takes 4-5 GB memory
+#      preds-obs distances takes 1-2 GB memory per batch, 4 batches (1440 pred points each)
+# SSN: R session takes 8-9 GB memory for building LSN, stream updist;
+#      6-8 GB for AFV, ~1.3 GB to add obs to LSN, 4-6 GB for estimation
 
 
 ## Subnetwork 5: Two neighboring HUC4s (30748 reaches) --------------------
@@ -100,16 +105,17 @@ streams = filter(streams_full, HUC4 %in% c("0514", "0513"))
 #                        bench_nws$Network[5], 
 #                        bench_nws$nreps_S3N[5], 
 #                        bench_nws$nreps_SSN[5])
-# error in SSN in building LSN:
+# error in SSN in building LSN when nobs is capped at 1000:
 # Error: vector memory limit of 16.0 Gb reached, see mem.maxVSize()
 # 32 GB was also not enough
 # so set it to 60 GB with mem.maxVSize(60000) and rerun
 # indeed, top (in terminal) indicates max memory is > 48 GB
-mem.maxVSize(60000)
+# mem.maxVSize(60000)
 benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[5], 
                        bench_nws$nreps_S3N[5], 
-                       bench_nws$nreps_SSN[5])
+                       bench_nws$nreps_SSN[5],
+                       SSN_preproc_only = TRUE)
 
 
 ## Subnetwork 6: HUC2 (169092 reaches) ------------------------------------
@@ -118,9 +124,23 @@ streams = filter(streams_full, HUC2 == "05")
 benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[6],
                        bench_nws$nreps_S3N[6], 
-                       bench_nws$nreps_SSN[6], 
+                       bench_nws$nreps_SSN[6],
                        onlyS3N = TRUE)
 beep(3)
+
+
+
+
+## Subnetwork 6: HUC2 (169092 reaches) ------------------------------------
+
+streams = filter(streams_full, HUC2 == "05")
+benchmark_and_validate(streams, pred_path,
+                       bench_nws$Network[6],
+                       bench_nws$nreps_S3N[6], 
+                       bench_nws$nreps_SSN[6],
+                       onlyS3N = TRUE)
+
+
 
 
 ## Summarize networks -----------------------------------------------------
@@ -137,10 +157,59 @@ for(nw in 1:6){
 
 ## Combine and summarize benchmarking results -----------------------------
 
+bench_nws = data.frame(
+  Network = 1:3,
+  nreps_S3N = c(50, 50, 50),
+  nreps_SSN = c(50, 50, 5),
+  nreach = c(284, 1273, 7146),
+  npreds = c(283, 1267, 7123),
+  nobs = c(142, 634, 3562)
+)
+
 ## Combine and summarize validation results -------------------------------
 
+bench1 = combine_runtimes_bothmodels(
+  bench_res_dir, 
+  bench_nws$Network[1], 
+  bench_nws$nreps_S3N[1], 
+  bench_nws$nreps_SSN[1])
 
+bench2 = combine_runtimes_bothmodels(
+  bench_res_dir, 
+  bench_nws$Network[2], 
+  bench_nws$nreps_S3N[2], 
+  bench_nws$nreps_SSN[2])
 
+bench3 = combine_runtimes_bothmodels(
+  bench_res_dir, 
+  bench_nws$Network[3], 
+  bench_nws$nreps_S3N[3], 
+  bench_nws$nreps_SSN[3])
 
+bench1$runtimes_S3N$stats
+bench1$runtimes_SSN$stats
+
+bench2$runtimes_S3N$stats
+bench2$runtimes_SSN$stats
+
+bench3$runtimes_S3N$stats
+bench3$runtimes_SSN$stats
+
+# let's make two tables, obs_only and obs_preds
+
+load("../BRISC_fish/bench_res/S3N_results_network2_rep1.rda")
+print("Network 1"); nrow(streams); nrow(obs); nrow(preds)
+runtimes
+load("../BRISC_fish/bench_res/SSN_results_network2_rep1.rda"); runtimes
+
+load("../BRISC_fish/bench_res/S3N_results_network3_rep1.rda")
+print("Network 2"); nrow(streams); nrow(obs); nrow(preds)
+runtimes
+load("../BRISC_fish/bench_res/SSN_results_network3_rep1.rda"); runtimes
+
+load("../BRISC_fish/bench_res/S3N_results_network4_rep1.rda")
+print("Network 3"); nrow(streams); nrow(obs); nrow(preds)
+runtimes
+load("../BRISC_fish/bench_res/SSN_results_network4_rep1.rda"); runtimes
 
 
