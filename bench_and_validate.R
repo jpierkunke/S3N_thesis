@@ -17,6 +17,8 @@ library(shapefiles) # for read.dbf
 library(magrittr) # for the eager pipe
 library(latex2exp) # for LaTeX formatting in plot labels
 library(lemon) # for repositioning plot legend in empty facets
+library(paletteer) # for colors in benchmark network maps
+library(PNWColors) # for colors in benchmark network maps
 library(SSNbler) # to benchmark SSN preprocessing
 library(SSN2) # to benchmark SSN distances and estimation
 library(BRISC) # version of BRISC I modified to handle S3N estimation and prediction
@@ -255,5 +257,169 @@ valid3 = combine_params_bothmodels(bench_res_dir,
                                    bench_nws$Network[3],
                                    bench_nws$nreps_S3N[3],
                                    bench_nws$nreps_SSN[3])
+
+
+
+## Plot benchmark networks ------------------------------------------------
+
+plot_network = function(bench_res_dir, network, plot_points = FALSE){
+  
+  my_colors = pnw_palette(
+    "Bay", 6, type="continuous")[c(6, 2, 4, 5, 3, 1)]
+  
+  # # version 1
+  # my_colors = pnw_palette(
+  #   "Bay", 25, type="continuous")[c(25, 5, 15, 20, 10, 1)]
+  
+  # my_colors = pnw_palette(
+  #   "Bay", 25, type="continuous")[c(seq(5,25,5),
+  #                                   seq(4,24,5),
+  #                                   seq(3,23,5),
+  #                                   seq(2,22,5),
+  #                                   seq(1,21,5))]
+  
+  # load streams, preds and obs for this network
+  load(paste0(bench_res_dir, "network", network, "_initial_data.rda"))
+  obs = filter(preds, COMID %in% obs$COMID)
+  # get additional streams info
+  
+  load(paste0(data_path, "streams_region5.rda"))
+  streams$nw1 = (streams$HUC10 == "0514020607")
+  streams$nw2 = (streams$HUC8 == "05140206")
+  streams$nw3 = (streams$HUC6 == "051402")
+  streams$nw4 = (streams$HUC4 == "0514")
+  streams$nw5 = (streams$HUC4 %in% c("0514", "0513"))
+  streams$nw6 = (streams$HUC2 == "05")
+  # streams$nw2not1 = (streams$nw2 & !streams$nw1)
+  # streams$nw3not2 = (streams$nw3 & !streams$nw2)
+  # streams$nw4not3 = (streams$nw4 & !streams$nw3)
+  # streams$nw5not4 = (streams$nw5 & !streams$nw4)
+  # streams$nw6not5 = (streams$nw6 & !streams$nw5)
+  # # check: indeed, each reach is in exactly one of these categories except for the two reaches not in Region 5
+  # streams$total = streams$nw1 + streams$nw2not1 + streams$nw3not2 + streams$nw4not3 + streams$nw5not4 + streams$nw6not5
+  # sum(streams$total != 1) #2
+  streams$color = as.factor(case_when(
+    streams$nw1 ~ 1,
+    streams$nw2 & !streams$nw1 ~ 2,
+    streams$nw3 & !streams$nw2 ~ 3,
+    streams$nw4 & !streams$nw3 ~ 4,
+    streams$nw5 & !streams$nw4 ~ 5,
+    streams$nw6 & !streams$nw5 ~ 6
+  ))
+  
+  if(network == 1){
+    streams = filter(streams, HUC10 == "0514020607")
+    nw_name = "HUC10 0514020607"
+  }
+  if(network == 2){
+    streams = filter(streams, HUC8 == "05140206")
+    nw_name = "HUC8 05140206"
+  }
+  if(network == 3){
+    streams = filter(streams, HUC6 == "051402")
+    nw_name = "HUC6 051402"
+  }
+  if(network == 4){
+    streams = filter(streams, HUC4 == "0514")
+    nw_name = "HUC4 0514"
+  }
+  if(network == 5){
+    streams = filter(streams, HUC4 %in% c("0514", "0513"))
+    nw_name = "HUC4s 0514, 0513"
+  }
+  if(network == 6){
+    streams = filter(streams, HUC2 == "05")
+    nw_name = "HUC2 05"
+    
+    usa <- st_as_sf(maps::map("state", fill=TRUE, plot=FALSE)) %>%
+      st_transform(crs = st_crs(streams))
+    
+    # plot of Subnetwork 6 with Subnetwork 5 highlighted in colors
+    ggplot() +
+      geom_sf(data = usa,
+              color = "#2b2b2b",
+              fill = "white") +
+      geom_sf(data = st_simplify(streams,
+                                 preserveTopology = FALSE,
+                                 dTolerance = 1000),
+              aes(color = color)) +
+      coord_sf(xlim = c(-92, -75),
+               ylim = c(25, 48),
+               default_crs = sf::st_crs(4326)) +
+      scale_color_manual(
+        values = my_colors)  +
+      ggthemes::theme_map() +
+      theme(legend.position = "none")
+    
+    ggsave(filename = paste0("benchmark_nw", network, ".png"),
+           width = 4, height = 4, units = "in")
+    
+    
+    # plot just of Region 5 flowlines
+    ggplot() +
+      geom_sf(data = usa,
+              color = "#2b2b2b",
+              fill = "white") +
+      geom_sf(data = st_simplify(streams,
+                                 preserveTopology = FALSE,
+                                 dTolerance = 1000),
+              color = "#1874cd") +
+      coord_sf(xlim = c(-92, -75),
+               ylim = c(25, 48),
+               default_crs = sf::st_crs(4326)) +
+      ggthemes::theme_map() +
+      theme(legend.position = "none")
+    
+    ggsave(filename = "flowlines_Region5.png",
+           width = 4, height = 4, units = "in")
+    
+  } else { # not all of region 5, so small enough to not need st_simplify or the map
+    
+    if(plot_points){
+      ggplot() +
+        geom_sf(data = streams, aes(color = color)) +
+        geom_sf(data = preds, color = "purple", size = 0.5) +
+        geom_sf(data = obs, color = "gold", size = 0.5) +
+        coord_sf(datum = st_crs(streams)) +
+        labs(title = paste0("Subnetwork ", network, ": ", nw_name)) +
+        scale_color_manual(
+          values = my_colors)  +
+        theme_bw() +
+        theme(legend.position = "none")
+    } else {
+      ggplot() +
+        geom_sf(data = streams, aes(color = color)) +
+        labs(title = paste0("Subnetwork ", network, ": ", nw_name)) +
+        scale_color_manual(
+          values = my_colors)  +
+        theme_bw() +
+        theme(legend.position = "none")
+    }
+    
+    ggsave(filename = paste0("benchmark_nw", network, ".png"),
+           width = 4, height = 4, units = "in")
+    
+  }
+  
+}
+
+# Subnetwork 1
+plot_network(bench_res_dir, network = 1, plot_points = FALSE)
+
+# Subnetwork 2
+plot_network(bench_res_dir, network = 2, plot_points = FALSE)
+
+# Subnetwork 3
+plot_network(bench_res_dir, network = 3, plot_points = FALSE)
+
+# Subnetwork 4
+plot_network(bench_res_dir, network = 4, plot_points = FALSE)
+
+# Subnetwork 5
+plot_network(bench_res_dir, network = 5, plot_points = FALSE)
+
+# Subnetwork 6
+plot_network(bench_res_dir, network = 6, plot_points = FALSE)
+
 
 
