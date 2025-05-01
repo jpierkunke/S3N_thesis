@@ -351,9 +351,8 @@ plot_network = function(bench_res_dir, network, plot_points = FALSE){
       ggthemes::theme_map() +
       theme(legend.position = "none")
     
-    ggsave(filename = paste0("benchmark_nw", network, ".png"),
+    ggsave(filename = paste0(bench_res_dir, "benchmark_nw", network, ".png"),
            width = 4, height = 4, units = "in")
-    
     
     # plot just of Region 5 flowlines
     ggplot() +
@@ -370,7 +369,7 @@ plot_network = function(bench_res_dir, network, plot_points = FALSE){
       ggthemes::theme_map() +
       theme(legend.position = "none")
     
-    ggsave(filename = "flowlines_Region5.png",
+    ggsave(filename = paste0(bench_res_dir, "flowlines_Region5.png"),
            width = 4, height = 4, units = "in")
     
   } else { # not all of region 5, so small enough to not need st_simplify or the map
@@ -396,7 +395,7 @@ plot_network = function(bench_res_dir, network, plot_points = FALSE){
         theme(legend.position = "none")
     }
     
-    ggsave(filename = paste0("benchmark_nw", network, ".png"),
+    ggsave(filename = paste0(bench_res_dir, "benchmark_nw", network, ".png"),
            width = 4, height = 4, units = "in")
     
   }
