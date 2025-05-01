@@ -15,6 +15,8 @@ library(mapview) # for visualizing spatial data
 library(tidyverse) # for efficient data manipulation
 library(shapefiles) # for read.dbf
 library(magrittr) # for the eager pipe
+library(latex2exp) # for LaTeX formatting in plot labels
+library(lemon) # for repositioning plot legend in empty facets
 library(SSNbler) # to benchmark SSN preprocessing
 library(SSN2) # to benchmark SSN distances and estimation
 library(BRISC) # version of BRISC I modified to handle S3N estimation and prediction
@@ -36,6 +38,7 @@ pwdist_input_dir = "pwdists/input/"
 pwdist_predsobs_dir = "pwdists/output_predsobs/"
 # where to find the obs-obs pairwise distance results from the cluster
 pwdist_obsobs_dir = "pwdists/output_obsobs/"
+bench_res_dir = "bench_results/"
 
 ## preprocess before benchmarking and validation ---------------------------
 
@@ -49,7 +52,6 @@ load(paste0(data_path, "streams_region5.rda"))
 streams_full = streams
 # set lsn file path and output path for benchmark/validation results
 lsn.path = "lsn"
-bench_res_dir = "bench_results/"
 
 bench_nws = data.frame(
   Network = 1:6,
@@ -131,71 +133,96 @@ beep(3)
 
 
 
-## Subnetwork 6: HUC2 (169092 reaches) ------------------------------------
-
-streams = filter(streams_full, HUC2 == "05")
-benchmark_and_validate(streams, pred_path,
-                       bench_nws$Network[6],
-                       bench_nws$nreps_S3N[6], 
-                       bench_nws$nreps_SSN[6],
-                       onlyS3N = TRUE)
-
-
-
-
 ## Summarize networks -----------------------------------------------------
+
+# for(nw in 1:6){
+#   load(paste0("bench_results/network", nw, "_initial_data.rda"))
+#   print(paste("Network", nw))
+#   print(paste("nreach", nrow(streams), "npreds", nrow(preds), "nobs", nrow(obs)))
+#   # print(paste("streams range", range(streams$COMID)))
+#   # print(paste("num of negative streams COMIDs", sum(streams$COMID < 0)))
+#   # print(paste("preds range", range(preds$COMID)))
+#   print("")
+# }
+
+# bench_nws = data.frame(
+#   Network = 1:3,
+#   nreps_S3N = c(50, 50, 50),
+#   nreps_SSN = c(50, 50, 5),
+#   nreach = c(284, 1273, 7146),
+#   npreds = c(283, 1267, 7123),
+#   nobs = c(142, 634, 3562)
+# )
+
+bench_nws = data.frame(
+  Network = 1:6,
+  nreach = NA,
+  npreds = NA,
+  nobs = NA,
+  nreps_S3N = c(50, 50, 50, 9, 1, NA),
+  nreps_SSN = c(50, 50, 5, 1, NA, NA),
+  preproc_only = c(FALSE, FALSE, FALSE, TRUE, TRUE, TRUE)
+)
 
 for(nw in 1:6){
   load(paste0("bench_results/network", nw, "_initial_data.rda"))
-  print(paste("Network", nw))
-  print(paste("nreach", nrow(streams), "npreds", nrow(preds), "nobs", nrow(obs)))
-  # print(paste("streams range", range(streams$COMID)))
-  # print(paste("num of negative streams COMIDs", sum(streams$COMID < 0)))
-  # print(paste("preds range", range(preds$COMID)))
-  print("")
+  bench_nws$nreach[nw] = nrow(streams)
+  bench_nws$npreds[nw] = nrow(preds)
+  bench_nws$nobs[nw] = nrow(obs)
 }
+# Network nreach npreds  nobs nreps_S3N nreps_SSN preproc_only
+# 1       1    284    283   142        50        50        FALSE
+# 2       2   1273   1267   634        50        50        FALSE
+# 3       3   7146   7123  3562        50         5        FALSE
+# 4       4  11540  11515  5758        10         2         TRUE
+# 5       5  30748  30698 10000        10         2         TRUE
 
 ## Combine and summarize benchmarking results -----------------------------
-
-bench_nws = data.frame(
-  Network = 1:3,
-  nreps_S3N = c(50, 50, 50),
-  nreps_SSN = c(50, 50, 5),
-  nreach = c(284, 1273, 7146),
-  npreds = c(283, 1267, 7123),
-  nobs = c(142, 634, 3562)
-)
-
-## Combine and summarize validation results -------------------------------
 
 bench1 = combine_runtimes_bothmodels(
   bench_res_dir, 
   bench_nws$Network[1], 
   bench_nws$nreps_S3N[1], 
   bench_nws$nreps_SSN[1])
+bench1$obs_only
+bench1$obs_preds
 
 bench2 = combine_runtimes_bothmodels(
   bench_res_dir, 
   bench_nws$Network[2], 
   bench_nws$nreps_S3N[2], 
   bench_nws$nreps_SSN[2])
+bench2$obs_only
+bench2$obs_preds
 
 bench3 = combine_runtimes_bothmodels(
-  bench_res_dir, 
-  bench_nws$Network[3], 
-  bench_nws$nreps_S3N[3], 
+  bench_res_dir,
+  bench_nws$Network[3],
+  bench_nws$nreps_S3N[3],
   bench_nws$nreps_SSN[3])
+bench3$obs_only
+bench3$obs_preds
 
-bench1$runtimes_S3N$stats
-bench1$runtimes_SSN$stats
+bench4 = combine_runtimes_bothmodels(
+  bench_res_dir,
+  bench_nws$Network[4],
+  bench_nws$nreps_S3N[4],
+  bench_nws$nreps_SSN[4],
+  obs_only_S3N = TRUE)
+bench4$obs_only
+bench4$obs_preds
 
-bench2$runtimes_S3N$stats
-bench2$runtimes_SSN$stats
+bench5 = combine_runtimes_bothmodels(
+  bench_res_dir,
+  bench_nws$Network[5],
+  bench_nws$nreps_S3N[5],
+  bench_nws$nreps_SSN[5],
+  obs_only_S3N = TRUE,
+  obs_only_SSN = TRUE)
+bench5$obs_only
+bench5$obs_preds
 
-bench3$runtimes_S3N$stats
-bench3$runtimes_SSN$stats
-
-# let's make two tables, obs_only and obs_preds
+### compare to old runtimes with original benchmark network choices ---------
 
 load("../BRISC_fish/bench_res/S3N_results_network2_rep1.rda")
 print("Network 1"); nrow(streams); nrow(obs); nrow(preds)
@@ -211,5 +238,22 @@ load("../BRISC_fish/bench_res/S3N_results_network4_rep1.rda")
 print("Network 3"); nrow(streams); nrow(obs); nrow(preds)
 runtimes
 load("../BRISC_fish/bench_res/SSN_results_network4_rep1.rda"); runtimes
+
+## Combine and summarize validation results -------------------------------
+
+valid1 = combine_params_bothmodels(bench_res_dir, 
+                                   bench_nws$Network[1],
+                                   bench_nws$nreps_S3N[1],
+                                   bench_nws$nreps_SSN[1])
+
+valid2 = combine_params_bothmodels(bench_res_dir, 
+                                   bench_nws$Network[2],
+                                   bench_nws$nreps_S3N[2],
+                                   bench_nws$nreps_SSN[2])
+
+valid3 = combine_params_bothmodels(bench_res_dir, 
+                                   bench_nws$Network[3],
+                                   bench_nws$nreps_S3N[3],
+                                   bench_nws$nreps_SSN[3])
 
 

@@ -3,6 +3,7 @@
 # Jess Kunke, 2025 April
 
 # run this script before bench_and_validate.R
+# this script also preprocesses streams for Region 5 results (Chapter 4)
 
 library(sf) # for reading and possibly writing shapefiles
 library(plyr) # for rbind.fill
