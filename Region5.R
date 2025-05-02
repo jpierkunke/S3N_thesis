@@ -161,66 +161,98 @@ toc() # Add obs to LSN: 21.916 sec elapsed
 
 # Compute obs-obs pairwise distances and neighbor variables ---------------
 
+# run this part of the code on the cluster
+
 # obs-obs distances are used in both estimation and prediction
 # neighbor variables are just for estimation
 
-tic("Obs-obs distances")
-system('cd pwdists; ./scripts/all_obsobs.sh')
-toc() # Obs-obs distances: sec elapsed
+# tic("Obs-obs distances")
+# system('cd pwdists; ./scripts/all_obsobs.sh')
+# toc() # Obs-obs distances: sec elapsed
+# 
+# # Compute preds-obs pairwise distances and neighbor variables for prediction --
+# 
+# tic("Preds-obs distances")
+# # determine batch number and size based on number of (unobserved) prediction points
+# batch_info = get_preds_batch_info( nrow(preds) - nrow(obs) )
+# m=10 # use 10 neighbors
+# args = sprintf("%i %i %i", batch_info$n, batch_info$size, m)
+# system(paste('cd pwdists; ./scripts/run_pwdist_locally.sh', args))
+# system(paste('cd pwdists; ./scripts/combine_pred_neighbors.sh', args))
+# toc() # Preds-obs distances: sec elapsed
 
-# Compute preds-obs pairwise distances and neighbor variables for prediction --
+# Prepare for estimation and prediction: generate data by species ---------------
 
-tic("Preds-obs distances")
-# determine batch number and size based on number of (unobserved) prediction points
-batch_info = get_preds_batch_info( nrow(preds) - nrow(obs) )
-m=10 # use 10 neighbors
-args = sprintf("%i %i %i", batch_info$n, batch_info$size, m)
-system(paste('cd pwdists; ./scripts/run_pwdist_locally.sh', args))
-system(paste('cd pwdists; ./scripts/combine_pred_neighbors.sh', args))
-toc() # Preds-obs distances: sec elapsed
+# this is the old code I used for the first Region 5 results
+count_each_species_in_fish(
+  fish, out_dir = fish_path, 
+  filename = "nobs_by_species_Region05.csv"
+)
+# 309 species
+# nobs_by_species %>% filter(nCOMIDs > 15) # 202 species left
 
-# load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data.RData"))
-# load(paste0(pwdist_obsobs_dir, "obsobs_dist_wt.rda"))
-# 
-# preds = left_join(
-#   preds,
-#   streams %>%
-#     st_drop_geometry() %>%
-#     data.frame() %>%
-#     select(ptID, Elevation),
-#   by="ptID"
-# )
-# 
-# obs$Elevation = preds$Elevation[1:nrow(obs)]
-# 
-# X = obs %>%
-#   st_drop_geometry() %>%
-#   data.frame() %>%
-#   mutate(Intercept = 1) %>%
-#   select(Intercept, Elevation) %>%
-#   as.matrix()
-# 
-# obs$DensityPer100m = simulate_SSN_data(obsobs_dist, obsobs_wt, X)
-# 
-# load(paste0(pwdist_obsobs_dir, "obs_neighbors.rda"))
-# 
-# tic("Estimation"); start_time = Sys.time()
-# estimation = BRISC_estimation_stream(
-#   coords = as.matrix(1:nrow(obs)),
-#   y = as.matrix(obs$DensityPer100m),
-#   x = X,
-#   neighbor = obs_neighbors,
-#   cov.model = "exponential",
-#   nugget_status = 1,
-#   verbose = TRUE
-# )
-# toc(); stop_time = Sys.time()
-# runtimes[5] = as.numeric(difftime(stop_time, start_time), units="secs")
-# 
-# params = c(
-#   estimation$Beta, # beta (intercept, elevation)
-#   estimation$Theta # sigma.sq, tau.sq, phi
-# )
-# params[5] = 1/params[5] # convert phi to lambda (range parameter)
-# names(params)[5] = "lambda"
+# how about we make predictions for all species with (non-zero) obs in at least 
+# as many COMIDs as the number of neighbors we're using?
+# in a sense, they all have obs at all the COMIDs, since the surveyers count 
+# all the fish they find and fish that are not recorded were not observed at 
+# that time and place, but I mean non-zero observations
+# species_for_prediction = filter(nobs_by_species, nCOMIDs > 15)$Common_Name
+
+get_obs_layer_for_each_species(
+  fish, 
+  out_dir = paste0(fish_path, "individual_species/"), 
+  region = "Region05"
+)
+
+
+
+
+# Estimation and prediction for each species ------------------------------------
+
+pwdist_obsobs_dir = "Region5_cluster_results/"
+
+load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data.RData"))
+load(paste0(pwdist_obsobs_dir, "obsobs_dist_wt.rda"))
+
+preds = left_join(
+  preds,
+  streams %>%
+    st_drop_geometry() %>%
+    data.frame() %>%
+    select(ptID, Elevation),
+  by="ptID"
+)
+
+obs$Elevation = preds$Elevation[1:nrow(obs)]
+
+X = obs %>%
+  st_drop_geometry() %>%
+  data.frame() %>%
+  mutate(Intercept = 1) %>%
+  select(Intercept, Elevation) %>%
+  as.matrix()
+
+obs$DensityPer100m = simulate_SSN_data(obsobs_dist, obsobs_wt, X)
+
+load(paste0(pwdist_obsobs_dir, "obs_neighbors.rda"))
+
+tic("Estimation"); start_time = Sys.time()
+estimation = BRISC_estimation_stream(
+  coords = as.matrix(1:nrow(obs)),
+  y = as.matrix(obs$DensityPer100m),
+  x = X,
+  neighbor = obs_neighbors,
+  cov.model = "exponential",
+  nugget_status = 1,
+  verbose = TRUE
+)
+toc(); stop_time = Sys.time()
+runtimes[5] = as.numeric(difftime(stop_time, start_time), units="secs")
+
+params = c(
+  estimation$Beta, # beta (intercept, elevation)
+  estimation$Theta # sigma.sq, tau.sq, phi
+)
+params[5] = 1/params[5] # convert phi to lambda (range parameter)
+names(params)[5] = "lambda"
 

@@ -2507,3 +2507,75 @@ stop_quietly <- function(){
   stop()
 }
 
+
+# functions for Region 5 -------------
+
+# note: each row corresponds to a unique COMID-Scientific_Name pair
+# n_distinct(fish) = n_distinct(select(fish, COMID, Scientific_Name)) = 171795 for Region 5
+count_each_species_in_fish = function(fish, out_dir=NULL, filename = "nobs_by_species.csv", write_to_file = TRUE){
+  
+  # table of number of observations by species
+  nobs_by_species = fish %>%
+    st_drop_geometry() %>%
+    group_by(Scientific_Name, Common_Name) %>%
+    summarise(
+      TotalCount = sum(CountReachTotal),
+      nCOMIDs = n_distinct(COMID)
+    ) %>%
+    ungroup() %>%
+    arrange(desc(TotalCount))
+  
+  if(write_to_file){
+    write_csv(nobs_by_species, file = paste0(out_dir, filename))
+  } else{
+    return(nobs_by_species)
+  }
+}
+
+get_obs_sf = function(fish, common_name, out_dir = NULL, filename = NULL, write_to_file = TRUE){
+  fish_stream_vars = fish %>%
+    select(COMID, HUC8:binaryID) %>%
+    unique()
+  
+  if(n_distinct(fish_stream_vars$COMID) != nrow(fish_stream_vars)){
+    stop("Error: fish_stream_vars does not have one row per COMID")
+  }
+  
+  this_species_fish_data = fish %>%
+    filter(Common_Name == common_name) %>%
+    select(COMID, Count, DensityPer100m, CountReachTotal)
+  
+  obs_sf = fish_stream_vars %>%
+    # add in fish data for the COMIDs at which this species was observed
+    st_join(this_species_fish_data, suffix=c("",".y")) %>%
+    select(-ends_with(".y")) %>%
+    # at these additional COMIDs, no fish of this species were observed,
+    # therefore set Count = 0
+    mutate(
+      Count = replace_na(Count, 0),
+      DensityPer100m = replace_na(DensityPer100m, 0),
+      CountReachTotal = replace_na(CountReachTotal, 0)
+    )
+  
+  if(write_to_file){
+    # note: writing to csv causes binaryIDs to be stored as Inf
+    write_csv(obs_sf, file = paste0(out_dir, filename))
+  } else{
+    return(obs_sf)
+  }
+}
+
+# write each species' obs layer to file
+get_obs_layer_for_each_species = function(fish, out_dir, region = ""){
+  cat(paste("Processing", n_distinct(fish$Common_Name), "species."), fill=TRUE)
+  i=1
+  for(common_name in unique(fish$Common_Name)){
+    cat(paste("Processing species", i))
+    obs = get_obs_sf(fish, common_name, out_dir = out_dir, 
+                     filename = paste0(str_replace(common_name, " ", "_"), "_", region, ".csv"))
+    i = i+1
+  }
+  cat("Done.", fill=TRUE)
+  
+}
+
