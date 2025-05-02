@@ -167,7 +167,7 @@ bench_nws = data.frame(
 )
 
 for(nw in 1:6){
-  load(paste0("bench_results/network", nw, "_initial_data.rda"))
+  load(paste0("bench_results_thesis/network", nw, "_initial_data.rda"))
   bench_nws$nreach[nw] = nrow(streams)
   bench_nws$npreds[nw] = nrow(preds)
   bench_nws$nobs[nw] = nrow(obs)
@@ -189,6 +189,26 @@ for(nw in 1:6){
 # network 5: S3N 5 runtimes (last 2 NA), SSN 5 runtimes (last 1 NA) (predistance only + obs only for both)
 # network 6: S3N 5 runtimes (last 2 NA), no SSN (predistance only + obs only for S3N)
 
+get_summary_for_table = function(network, benchres){
+  if(network < 4){
+    nwres = data.frame(
+      Network = network,
+      Task = benchres$obs_only$task[1:3],
+      S3N = benchres$obs_only$S3N_avg[c(1,2,4)],
+      SSN = c(benchres$obs_only$SSN_avg[1:2],
+              sum(benchres$obs_only$SSN_avg[3:4]))
+    )
+  } else {
+    nwres = data.frame(
+      Network = network,
+      Task = benchres$obs_only$task[1:3],
+      S3N = benchres$obs_only$S3N_avg[1:3],
+      SSN = benchres$obs_only$SSN_avg[1:3]
+    )
+  }
+  return(nwres)
+}
+
 bench1 = combine_runtimes_bothmodels(
   bench_res_dir, 
   bench_nws$Network[1], 
@@ -196,6 +216,24 @@ bench1 = combine_runtimes_bothmodels(
   bench_nws$nreps_SSN[1])
 bench1$obs_only
 bench1$obs_preds
+#                    task    S3N_avg      S3N_sd    SSN_avg    SSN_sd
+# 1             Build LSN 0.22744269 0.138381518  1.5055646 0.8733712
+# 2 Stream updist and AFV 1.81468081 0.209169285  1.1515321 1.0070120
+# 3        Add obs to LSN         NA          NA  6.6005514 0.7398649
+# 4    Obs updist and AFV 3.64795209 0.195317421  0.1410471 0.5748062
+# 5          Assemble SSN         NA          NA  1.4945106 0.8552582
+# 6           Obs distmat 2.74083258 0.117723897  0.5760140 0.5998521
+# 7            Estimation 0.02619061 0.004516947  1.6473641 0.9296746
+# 8                 Total 8.45709879          NA 13.1165839        NA
+#
+#                    task    S3N_avg      S3N_sd    SSN_avg    SSN_sd
+# 1             Build LSN 0.22744269 0.138381518  1.5055646 0.8733712
+# 2 Stream updist and AFV 1.81468081 0.209169285  1.1515321 1.0070120
+# 3        Add obs to LSN 3.64795209          NA   6.741598        NA
+# 5          Assemble SSN         NA          NA  1.4945106 0.8552582
+# 6           Obs distmat 2.74083258 0.117723897  0.5760140 0.5998521
+# 7            Estimation 0.02619061 0.004516947  1.6473641 0.9296746
+# 8                 Total 8.45709879          NA 13.1165839        NA
 
 bench2 = combine_runtimes_bothmodels(
   bench_res_dir, 
@@ -204,6 +242,24 @@ bench2 = combine_runtimes_bothmodels(
   bench_nws$nreps_SSN[2])
 bench2$obs_only
 bench2$obs_preds
+#                    task    S3N_avg     S3N_sd     SSN_avg      SSN_sd
+# 1             Build LSN  0.7285639 0.08947661  2.99213656 0.332678843
+# 2 Stream updist and AFV  2.3312726 0.11925206  4.72642903 0.376432657
+# 3        Add obs to LSN         NA         NA 25.18034643 0.314592672
+# 4    Obs updist and AFV  3.8286596 0.31508041  0.06358808 0.009856377
+# 5          Assemble SSN         NA         NA  2.32831927 0.044189002
+# 6           Obs distmat  5.2026225 0.15863773  0.57475306 0.023485215
+# 7            Estimation  0.1761315 0.06651270  8.47340318 1.239037395
+# 8                 Total 12.2672500         NA 44.33897562          NA
+# 
+#                    task    S3N_avg     S3N_sd     SSN_avg      SSN_sd
+# 1             Build LSN  0.7285639 0.08947661  2.99213656 0.332678843
+# 2 Stream updist and AFV  2.3312726 0.11925206  4.72642903 0.376432657
+# 3        Add obs to LSN  3.8286596         NA 25.24393             NA
+# 5          Assemble SSN         NA         NA  2.32831927 0.044189002
+# 6           Obs distmat  5.2026225 0.15863773  0.57475306 0.023485215
+# 7            Estimation  0.1761315 0.06651270  8.47340318 1.239037395
+# 8                 Total 12.2672500         NA 44.33897562          NA
 
 bench3 = combine_runtimes_bothmodels(
   bench_res_dir,
@@ -212,42 +268,181 @@ bench3 = combine_runtimes_bothmodels(
   bench_nws$nreps_SSN[3])
 bench3$obs_only
 bench3$obs_preds
+#                    task     S3N_avg    S3N_sd      SSN_avg       SSN_sd
+# 1             Build LSN   2.7910486 0.4181868   26.8652709   0.91765570
+# 2 Stream updist and AFV   6.6825090 0.3104472   66.0792157   2.96400747
+# 3        Add obs to LSN          NA        NA  142.2515071   0.82120930
+# 4    Obs updist and AFV   4.0823088 0.3371444    0.1851079   0.01100262
+# 5          Assemble SSN          NA        NA   18.9790649   1.78823961
+# 6           Obs distmat 106.6794731 0.9506971   14.4666812   0.31992008
+# 7            Estimation   0.8290041 0.4319330  912.4498494 107.34362815
+# 8                 Total 121.0643436        NA 1181.2766972           NA
+#
+#                    task     S3N_avg    S3N_sd      SSN_avg       SSN_sd
+# 1             Build LSN   2.7910486 0.4181868   26.8652709   0.91765570
+# 2 Stream updist and AFV   6.6825090 0.3104472   66.0792157   2.96400747
+# 3        Add obs to LSN   4.0823088        NA  142.4366              NA
+# 5          Assemble SSN          NA        NA   18.9790649   1.78823961
+# 6           Obs distmat 106.6794731 0.9506971   14.4666812   0.31992008
+# 7            Estimation   0.8290041 0.4319330  912.4498494 107.34362815
+# 8                 Total 121.0643436        NA 1181.2766972           NA
 
-bench4 = combine_runtimes_bothmodels(
+bench4 = combine_runtimes_predistonly(
   bench_res_dir,
   bench_nws$Network[4],
   bench_nws$nreps_S3N[4],
   bench_nws$nreps_SSN[4],
   obs_only_S3N = TRUE,
   obs_only_SSN = TRUE,
-  predist_only_S3N = TRUE,
-  predist_only_SSN = TRUE)
+  predist_only = TRUE)
+# predist_only_S3N = TRUE,
+# predist_only_SSN = TRUE)
 bench4$obs_only
-bench4$obs_preds
+#                    task   S3N_avg    S3N_sd   SSN_avg    SSN_sd
+# 1             Build LSN  5.938159 0.2277486 157.45195 13.985799
+# 2 Stream updist and AFV 12.977719 1.5048399 192.78123 10.051779
+# 3        Add obs to LSN  4.235065 0.1040615 239.19207  5.820844
+# 4          Assemble SSN        NA        NA  42.80426  4.447670
+# 5                 Total 23.150942        NA 632.22950        NA
 
-bench5 = combine_runtimes_bothmodels(
+# load("bench_results_thesis/results_with_extra/SSN_results_network4_rep1.rda")
+runtimes_SSN = combine_runtimes_onemodel(bench_res_dir = "bench_results_thesis/results_with_extra/", 
+                                         network = 4, nreps = 1, model = "SSN", 
+                                         obs_only = FALSE)
+#           Build LSN  168.5525270
+# Stream updist + AFV  252.2298
+#      Add obs to LSN  342.9061 (includes updist + AFV)
+#        Assemble SSN   61.5808930
+#         Obs distmat   61.5735891
+#          Estimation 6095.7276890
+#      Total of these 6982.571 (1.9 hours)
+
+bench5 = combine_runtimes_predistonly(
   bench_res_dir,
   bench_nws$Network[5],
   bench_nws$nreps_S3N[5],
   bench_nws$nreps_SSN[5],
   obs_only_S3N = TRUE,
   obs_only_SSN = TRUE,
-  predist_only_S3N = TRUE,
-  predist_only_SSN = TRUE)
+  predist_only = TRUE)
+# predist_only_S3N = TRUE,
+# predist_only_SSN = TRUE)
 bench5$obs_only
-bench5$obs_preds
+#                    task  S3N_avg    S3N_sd   SSN_avg    SSN_sd
+# 1             Build LSN 12.53213 0.3854917 2411.9265 127.96005
+# 2 Stream updist and AFV 28.13694 1.2296416 1582.2443  62.75788
+# 3        Add obs to LSN  6.34922 0.7430853  429.5282  12.77543
+# 4          Assemble SSN       NA        NA  399.8852  57.06011
+# 5                 Total 47.01829        NA 4823.5842        NA
 
-bench6 = combine_runtimes_bothmodels(
+# load("bench_results_thesis/results_with_extra/S3N_results_network5_rep1.rda")
+# params
+# #      beta_1      beta_2    sigma.sq      tau.sq      lambda 
+# # -44.0828437   0.5001258   4.9754502   0.1473866   5.2363228 
+runtimes_S3N = combine_runtimes_onemodel(bench_res_dir = "bench_results_thesis/results_with_extra/", 
+                                         network = 5, nreps = 1, model = "S3N", 
+                                         obs_only = TRUE); runtimes_S3N
+
+# 1                 Build LSN   11.918482
+# 2     Stream updist and AFV   27.487936
+# 3 Prep to compute distances    6.754933
+# 4               Obs distmat 3606.981447
+# 5                Estimation    1.918258
+#                       Total 3655.061 (~ 1 hr)
+
+bench6 = combine_runtimes_predistonly(
   bench_res_dir,
   bench_nws$Network[6],
   bench_nws$nreps_S3N[6],
   bench_nws$nreps_SSN[6],
   obs_only_S3N = TRUE,
   obs_only_SSN = TRUE,
-  predist_only_S3N = TRUE,
-  predist_only_SSN = TRUE)
-bench5$obs_only
-bench5$obs_preds
+  predist_only = TRUE)
+# predist_only_S3N = TRUE,
+# predist_only_SSN = TRUE)
+bench6$obs_only
+#                    task   S3N_avg    S3N_sd SSN_avg SSN_sd
+# 1             Build LSN  61.07921 2.4412279      NA     NA
+# 2 Stream updist and AFV  70.73305 1.2198065      NA     NA
+# 3        Add obs to LSN  18.02988 0.8822904      NA     NA
+# 4          Assemble SSN        NA        NA      NA     NA
+# 5                 Total 149.84214        NA      NA     NA
+
+nw1_res = get_summary_for_table(1, bench1)
+nw2_res = get_summary_for_table(2, bench2)
+nw3_res = get_summary_for_table(3, bench3)
+nw4_res = get_summary_for_table(4, bench4)
+nw5_res = get_summary_for_table(5, bench5)
+nw6_res = get_summary_for_table(6, bench6)
+nwres = rbind(nw1_res, nw2_res, nw3_res, nw4_res, nw5_res, nw6_res)
+nwres$Task = c("Build_LSN", "Stream_updist", "Obs_updist")
+nwres_long = nwres
+nwres = pivot_wider(nwres, names_from = "Task", values_from = S3N:SSN)
+nwres$BuildLSNratio = nwres$SSN_Build_LSN/nwres$S3N_Build_LSN
+nwres$Streamratio = nwres$SSN_Stream_updist/nwres$S3N_Stream_updist
+nwres$Obsratio = nwres$SSN_Obs_updist/nwres$S3N_Obs_updist
+nwres = nwres[,c(1, 2,5,8, 3,6,9, 4,7,10)]
+#   Network S3N_Build_LSN SSN_Build_LSN BuildLSNratio S3N_Stream_updist SSN_Stream_updist Streamratio S3N_Obs_updist SSN_Obs_updist Obsratio
+#     <dbl>         <dbl>         <dbl>         <dbl>             <dbl>             <dbl>       <dbl>          <dbl>          <dbl>    <dbl>
+# 1       1         0.227          1.51          6.62              1.81              1.15       0.635           3.65           6.74     1.85
+# 2       2         0.729          2.99          4.11              2.33              4.73       2.03            3.83          25.2      6.59
+# 3       3         2.79          26.9           9.63              6.68             66.1        9.89            4.08         142.      34.9 
+# 4       4         5.94         157.           26.5              13.0             193.        14.9             4.24         239.      56.5 
+# 5       5        12.5         2412.          192.               28.1            1582.        56.2             6.35         430.      67.7 
+# 6       6        61.1           NA            NA                70.7              NA         NA              18.0           NA       NA   
+
+
+# make benchmarking plot
+
+bench_res_plot = nwres_long %>%
+  left_join(bench_nws, by = "Network") %>%
+  mutate(Task = factor(
+    ifelse(
+      Task == "Build_LSN", 
+      "Build stream network",
+      ifelse(
+        Task == "Stream_updist",
+        "Compute stream updist",
+        "Compute site updist"
+      )), levels = c("Build stream network", 
+                     "Compute stream updist", 
+                     "Compute site updist")))
+
+bench_long = bench_res_plot %>%
+  pivot_longer(cols = S3N:SSN, names_to = "Software", values_to = "Time")
+
+# ggplot(filter(bench_long, Task != "Compute site updist"), 
+ggplot(bench_long, 
+       aes(x = log(nreach, base = 10), 
+           y = log(Time, base = 10), color = Software)) +
+  facet_wrap(Task ~ .) +
+  geom_line() + geom_point() +
+  labs(x = TeX("log$_{10}$(Number of reaches)"),
+       y = TeX("log$_{10}$(Time in seconds)")) +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.59, 0.21),
+        text = element_text(size = 11)) #,
+# legend.text = element_text(size = 12))
+
+ggsave(filename = paste0(bench_res_dir, "benchmark_plot_nreaches.png"),
+       width = 8, height = 3, units = "in")
+
+ggplot(filter(bench_long, Task == "Compute site updist"), 
+       aes(x = log(nobs, base = 10), 
+           y = log(Time, base = 10), color = Software)) +
+  facet_wrap(Task ~ .) +
+  geom_line() + geom_point() +
+  labs(x = TeX("log$_{10}$(Number of obs. points)"),
+       y = TeX("log$_{10}$(Time in seconds)")) +
+  theme_bw() +
+  theme(legend.position = "none",
+        # legend.position.inside = c(0.59, 0.21),
+        text = element_text(size = 11))
+
+ggsave(filename = paste0(bench_res_dir, "benchmark_plot_nobs.png"),
+       width = 2.7, height = 3, units = "in")
+
 
 ### compare to old runtimes with original benchmark network choices ---------
 

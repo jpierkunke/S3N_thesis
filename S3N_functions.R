@@ -2108,35 +2108,59 @@ SSN_preproc_and_estimation_withwithoutpreds = function(network, rep, out_dir, ls
        file = paste0(out_dir, "SSN_results_network", network, "_rep", rep, ".rda"))
 }
 
-combine_runtimes_onemodel = function(bench_res_dir, network, nreps, model, obs_only = FALSE){
+combine_runtimes_onemodel = function(bench_res_dir, network, nreps, model, 
+                                     obs_only = FALSE, predist_only = FALSE){
   message(paste("Model", model, "obs_only is", obs_only))
+  
+  if(model == "SSN" & !obs_only){ # old version
+    message("not obs_only")
+    tasks = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
+                   "Obs updist", "Sites AFV", 
+                   "Assemble SSN", "Obs distmat", "Estimation", 
+                   "Add preds to LSN", "Obs preds updist", "Obs preds AFV", 
+                   "Assemble SSN with preds", "Obs preds distmat", "Estimation with preds")
+  }
+  if(model == "SSN" & obs_only & !predist_only){ # old version
+    tasks = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
+                   "Obs updist", "Sites AFV", 
+                   "Assemble SSN", "Obs distmat", "Estimation")
+  }
+  if(model == "SSN" & obs_only & predist_only){
+    message("obs_only and predist_only")
+    tasks = c("Build LSN", "Stream updist and AFV", "Add obs to LSN", 
+                   "Assemble SSN", "Estimation")
+  }
+  if(model == "S3N" & !obs_only){
+    tasks = c("Build LSN", "Stream updist and AFV", "Prep to compute distances", 
+                   "Obs distmat", "Preds distmat", "Estimation")
+  }
+  if(model == "S3N" & obs_only & !predist_only){
+    tasks = c("Build LSN", "Stream updist and AFV", "Prep to compute distances", 
+                   "Obs distmat", "Estimation")
+  }
+  if(model == "S3N" & obs_only & predist_only){ # for now same results whether or not predist_only
+    tasks = c("Build LSN", "Stream updist and AFV", "Add obs to LSN", 
+                   "Obs distmat", "Estimation")
+  }
+  
   if(is.na(nreps)){
     
     if(model == "SSN"){
       stats = data.frame(
-        avg = rep(NA, 15),
-        med = rep(NA, 15),
-        std = rep(NA, 15)
+        avg = rep(NA, length(tasks)),
+        med = rep(NA, length(tasks)),
+        std = rep(NA, length(tasks))
       )
-      stats$task = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
-                     "Obs updist", "Sites AFV", 
-                     "Assemble SSN", "Obs distmat", "Estimation", 
-                     "Add preds to LSN", "Obs preds updist", "Obs preds AFV", 
-                     "Assemble SSN with preds", "Obs preds distmat", "Estimation with preds")
     }
     if(model == "S3N"){
       stats = data.frame(
-        avg = rep(NA, 6),
-        med = rep(NA, 6),
-        std = rep(NA, 6)
+        avg = rep(NA, length(tasks)),
+        med = rep(NA, length(tasks)),
+        std = rep(NA, length(tasks))
       )
-      stats$task = c("Build LSN", "Stream updist and AFV", "Prep to compute distances", 
-                     "Obs distmat", "Preds distmat", "Estimation")
     }
-    stats = relocate(stats, task)
     
-    return(list(stats = stats))
-  } else {
+  } else { # nreps is not NA
     ndigits = ceiling(log(nreps, base = 10))
     one = str_pad("1", ndigits, side = "left", pad = "0")
     load(paste0(bench_res_dir, model, "_results_network", network, "_rep", one, ".rda"))
@@ -2153,40 +2177,20 @@ combine_runtimes_onemodel = function(bench_res_dir, network, nreps, model, obs_o
         med = apply(runtimes_all, 2, median),
         std = apply(runtimes_all, 2, sd)
       )
-    } else{
+    } else{ # nreps = 1
       stats = data.frame(
         avg = runtimes_all,
         med = runtimes_all,
         std = NA)
     }
+  } # end conditionals to handle nreps = NA, 1, >1
+  
+  stats$task = tasks
+  stats = relocate(stats, task)
     
-    if(model == "SSN" & !obs_only){
-      stats$task = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
-                     "Obs updist", "Sites AFV", 
-                     "Assemble SSN", "Obs distmat", "Estimation", 
-                     "Add preds to LSN", "Obs preds updist", "Obs preds AFV", 
-                     "Assemble SSN with preds", "Obs preds distmat", "Estimation with preds")
-    }
-    if(model == "SSN" & obs_only & !predist_only){
-      stats$task = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
-                     "Obs updist", "Sites AFV", 
-                     "Assemble SSN", "Obs distmat", "Estimation")
-    }
-    if(model == "SSN" & obs_only & predist_only){
-      stats$task = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
-                     "Obs updist", "Sites AFV", 
-                     "Assemble SSN", "Obs distmat", "Estimation")
-    }
-    if(model == "S3N" & !obs_only){
-      stats$task = c("Build LSN", "Stream updist and AFV", "Prep to compute distances", 
-                     "Obs distmat", "Preds distmat", "Estimation")
-    }
-    if(model == "S3N" & obs_only){
-      stats$task = c("Build LSN", "Stream updist and AFV", "Prep to compute distances", 
-                     "Obs distmat", "Estimation")
-    }
-    stats = relocate(stats, task)
-    
+  if(is.na(nreps)){
+    return(list(stats = stats))
+  } else{
     return(list(runtimes_all = runtimes_all, stats = stats))
   }
 }
@@ -2287,6 +2291,49 @@ combine_runtimes_bothmodels = function(bench_res_dir, network, nreps_S3N, nreps_
                 obs_only = obs_only))
   }
 
+}
+
+
+combine_runtimes_predistonly = function(bench_res_dir, network, nreps_S3N, nreps_SSN, 
+                                        obs_only_S3N = FALSE, obs_only_SSN = FALSE, predist_only = FALSE){
+  runtimes_S3N = combine_runtimes_onemodel(bench_res_dir, network, nreps_S3N, 
+                                           "S3N", obs_only = obs_only_S3N, 
+                                           predist_only = predist_only)
+  runtimes_SSN = combine_runtimes_onemodel(bench_res_dir, network, nreps_SSN, 
+                                           "SSN", obs_only = obs_only_SSN, 
+                                           predist_only = predist_only)
+  
+  # make the table for obs only ------------
+  
+  estS3N = select(runtimes_S3N$stats, -med)
+  # drop row with Preds distmat
+  estS3N = filter(estS3N, !(task %in% c("Obs distmat", "Estimation")))
+  estS3N = rename(estS3N, S3N_avg = avg, S3N_sd = std)
+  
+  estSSN = runtimes_SSN$stats %>%
+    select(-med) %>%
+    # get rid of tasks including "preds"
+    filter(task != "Estimation") %>%
+    rename(SSN_avg = avg, SSN_sd = std)
+  
+  obs_only = full_join(estS3N, estSSN, by="task")
+  obs_only = add_row(obs_only,
+                     task = "Total",
+                     S3N_avg = sum(obs_only$S3N_avg, na.rm = TRUE),
+                     S3N_sd = NA,
+                     SSN_avg = ifelse(
+                       # if all SSN avg times are NA,
+                       sum(is.na(obs_only$SSN_avg)) == length(obs_only$SSN_avg),
+                       # return NA
+                       NA,
+                       # otherwise return the sum of the non-NA times
+                       sum(obs_only$SSN_avg, na.rm = TRUE)
+                     ),
+                     SSN_sd = NA)
+  
+  return(list(runtimes_S3N = runtimes_S3N, runtimes_SSN = runtimes_SSN,
+              obs_only = obs_only))
+  
 }
 
 combine_params_onemodel = function(bench_res_dir, network, nreps, model, one){
