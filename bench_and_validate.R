@@ -421,4 +421,59 @@ plot_network(bench_res_dir, network = 5, plot_points = FALSE)
 plot_network(bench_res_dir, network = 6, plot_points = FALSE)
 
 
+## Generate more benchmark and validation results for large networks --------------
 
+# for benchmarking only, no estimation/validation
+# load streams
+load(paste0(data_path, "streams_region5.rda"))
+# create a backup copy
+streams_full = streams
+# set lsn file path and output path for benchmark/validation results
+lsn.path = "lsn"
+
+bench_nws = data.frame(
+  Network = 1:6,
+  nreps_S3N = c(50, 50, 50, 10, 10, 10),
+  nreps_SSN = c(50, 50, 50, 10,  2, NA) # for SSN network 5, do preprocessing only, no estimation
+)
+
+## network 4
+streams = filter(streams_full, HUC4 == "0514")
+benchmark_and_validate(streams, pred_path,
+                       bench_nws$Network[4], 
+                       bench_nws$nreps_S3N[4], 
+                       bench_nws$nreps_SSN[4],
+                       predist_only = TRUE)
+
+## network 6
+streams = filter(streams_full, HUC2 == "05")
+benchmark_and_validate(streams, pred_path,
+                       bench_nws$Network[6], 
+                       bench_nws$nreps_S3N[6], 
+                       bench_nws$nreps_SSN[6],
+                       predist_only = TRUE,
+                       onlyS3N = TRUE)
+
+## network 5
+streams = filter(streams_full, HUC4 %in% c("0514", "0513"))
+mem.maxVSize(60000)
+benchmark_and_validate(streams, pred_path,
+                       bench_nws$Network[5], 
+                       bench_nws$nreps_S3N[5], 
+                       bench_nws$nreps_SSN[5],
+                       predist_only = TRUE)
+mem.maxVSize(16384)
+Sys.sleep(30)
+beep(3)
+
+# Generate more SSN validation results for Network 3 (slow, takes about 30 hours)
+nreps = 50; network = 3; out_dir = "valid_results/"
+lsn.path = "lsn"
+ndigits = ceiling(log(nreps, base = 10))
+for(rep in 1:nreps){
+  message(paste("Network", network, "SSN benchmark rep", rep, "of", nreps))
+  SSN_preproc_and_estimation(network, 
+                             str_pad(rep, ndigits, side = "left", pad = "0"),
+                             # need estimation for validation results
+                             out_dir, lsn.path, preproc_only = FALSE, predist_only = FALSE)
+}
