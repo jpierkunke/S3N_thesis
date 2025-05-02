@@ -161,8 +161,8 @@ bench_nws = data.frame(
   nreach = NA,
   npreds = NA,
   nobs = NA,
-  nreps_S3N = c(50, 50, 50, 9, 1, NA),
-  nreps_SSN = c(50, 50, 5, 1, NA, NA),
+  nreps_S3N = c(50, 50, 50, 10, 10, 10),
+  nreps_SSN = c(50, 50,  5, 10,  2, NA), # eventually do 50 SSN runs on network 3
   preproc_only = c(FALSE, FALSE, FALSE, TRUE, TRUE, TRUE)
 )
 
@@ -176,10 +176,18 @@ for(nw in 1:6){
 # 1       1    284    283   142        50        50        FALSE
 # 2       2   1273   1267   634        50        50        FALSE
 # 3       3   7146   7123  3562        50         5        FALSE
-# 4       4  11540  11515  5758        10         2         TRUE
+# 4       4  11540  11515  5758        10        10         TRUE
 # 5       5  30748  30698 10000        10         2         TRUE
+# 6       6 169092 168875 10000        10        NA         TRUE
 
 ## Combine and summarize benchmarking results -----------------------------
+
+# network 1: S3N 6 runtimes + params, SSN 15 runtimes + params (estimation for both, obs + preds both)
+# network 2: S3N 6 runtimes + params, SSN 15 runtimes + params (estimation for both, obs + preds both)
+# network 3: S3N 6 runtimes + params, SSN 15 runtimes + params (estimation for both, obs + preds both)
+# network 4: S3N 5 runtimes (last 2 NA), SSN 5 runtimes (last 1 NA) (predistance only + obs only for both)
+# network 5: S3N 5 runtimes (last 2 NA), SSN 5 runtimes (last 1 NA) (predistance only + obs only for both)
+# network 6: S3N 5 runtimes (last 2 NA), no SSN (predistance only + obs only for S3N)
 
 bench1 = combine_runtimes_bothmodels(
   bench_res_dir, 
@@ -210,7 +218,10 @@ bench4 = combine_runtimes_bothmodels(
   bench_nws$Network[4],
   bench_nws$nreps_S3N[4],
   bench_nws$nreps_SSN[4],
-  obs_only_S3N = TRUE)
+  obs_only_S3N = TRUE,
+  obs_only_SSN = TRUE,
+  predist_only_S3N = TRUE,
+  predist_only_SSN = TRUE)
 bench4$obs_only
 bench4$obs_preds
 
@@ -220,7 +231,21 @@ bench5 = combine_runtimes_bothmodels(
   bench_nws$nreps_S3N[5],
   bench_nws$nreps_SSN[5],
   obs_only_S3N = TRUE,
-  obs_only_SSN = TRUE)
+  obs_only_SSN = TRUE,
+  predist_only_S3N = TRUE,
+  predist_only_SSN = TRUE)
+bench5$obs_only
+bench5$obs_preds
+
+bench6 = combine_runtimes_bothmodels(
+  bench_res_dir,
+  bench_nws$Network[6],
+  bench_nws$nreps_S3N[6],
+  bench_nws$nreps_SSN[6],
+  obs_only_S3N = TRUE,
+  obs_only_SSN = TRUE,
+  predist_only_S3N = TRUE,
+  predist_only_SSN = TRUE)
 bench5$obs_only
 bench5$obs_preds
 
@@ -430,41 +455,60 @@ load(paste0(data_path, "streams_region5.rda"))
 streams_full = streams
 # set lsn file path and output path for benchmark/validation results
 lsn.path = "lsn"
+bench_res_dir = "valid_results/"
+
+# bench_nws = data.frame(
+#   Network = 1:6,
+#   nreps_S3N = c(50, 50, 50, 10, 10, 10),
+#   nreps_SSN = c(50, 50, 50, 10,  2, NA) # for SSN network 5, do preprocessing only, no estimation
+# )
 
 bench_nws = data.frame(
   Network = 1:6,
-  nreps_S3N = c(50, 50, 50, 10, 10, 10),
-  nreps_SSN = c(50, 50, 50, 10,  2, NA) # for SSN network 5, do preprocessing only, no estimation
+  nreps_S3N = c(1, 50, 50, 10, 10, 10),
+  nreps_SSN = c(1, 50, 50, 10,  2, NA) # for SSN network 5, do preprocessing only, no estimation
 )
 
-## network 4
-streams = filter(streams_full, HUC4 == "0514")
+## network 1
+streams = filter(streams_full, HUC10 == "0514020607")
 benchmark_and_validate(streams, pred_path,
-                       bench_nws$Network[4], 
-                       bench_nws$nreps_S3N[4], 
-                       bench_nws$nreps_SSN[4],
-                       predist_only = TRUE)
-
-## network 6
-streams = filter(streams_full, HUC2 == "05")
-benchmark_and_validate(streams, pred_path,
-                       bench_nws$Network[6], 
-                       bench_nws$nreps_S3N[6], 
-                       bench_nws$nreps_SSN[6],
+                       bench_nws$Network[1],
+                       bench_nws$nreps_S3N[1],
+                       bench_nws$nreps_SSN[1],
                        predist_only = TRUE,
-                       onlyS3N = TRUE)
+                       bench_res_dir = bench_res_dir)
 
-## network 5
-streams = filter(streams_full, HUC4 %in% c("0514", "0513"))
-mem.maxVSize(60000)
-benchmark_and_validate(streams, pred_path,
-                       bench_nws$Network[5], 
-                       bench_nws$nreps_S3N[5], 
-                       bench_nws$nreps_SSN[5],
-                       predist_only = TRUE)
-mem.maxVSize(16384)
-Sys.sleep(30)
-beep(3)
+# ## network 4
+# streams = filter(streams_full, HUC4 == "0514")
+# benchmark_and_validate(streams, pred_path,
+#                        bench_nws$Network[4], 
+#                        bench_nws$nreps_S3N[4], 
+#                        bench_nws$nreps_SSN[4],
+#                        predist_only = TRUE,
+#                        bench_res_dir = bench_res_dir)
+# 
+# ## network 6
+# streams = filter(streams_full, HUC2 == "05")
+# benchmark_and_validate(streams, pred_path,
+#                        bench_nws$Network[6], 
+#                        bench_nws$nreps_S3N[6], 
+#                        bench_nws$nreps_SSN[6],
+#                        predist_only = TRUE,
+#                        onlyS3N = TRUE,
+#                        bench_res_dir = bench_res_dir)
+# 
+# ## network 5
+# streams = filter(streams_full, HUC4 %in% c("0514", "0513"))
+# mem.maxVSize(60000)
+# benchmark_and_validate(streams, pred_path,
+#                        bench_nws$Network[5], 
+#                        bench_nws$nreps_S3N[5], 
+#                        bench_nws$nreps_SSN[5],
+#                        predist_only = TRUE,
+#                        bench_res_dir = bench_res_dir)
+# mem.maxVSize(16384)
+# Sys.sleep(30)
+# beep(3)
 
 # Generate more SSN validation results for Network 3 (slow, takes about 30 hours)
 nreps = 50; network = 3; out_dir = "valid_results/"

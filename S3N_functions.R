@@ -1525,6 +1525,9 @@ S3N_preproc_and_estimation = function(network, rep, out_dir, predist_only = FALS
   toc(); stop_time = Sys.time()
   runtimes[3] = as.numeric(difftime(stop_time, start_time), units="secs")
   
+  # load the results so that updated obs, preds, streams are written to file
+  load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data.RData"))
+  
   if(!predist_only){
     
     tic("Obs-obs distances"); start_time = Sys.time()
@@ -1532,7 +1535,6 @@ S3N_preproc_and_estimation = function(network, rep, out_dir, predist_only = FALS
     toc(); stop_time = Sys.time()
     runtimes[4] = as.numeric(difftime(stop_time, start_time), units="secs")
     
-    load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data.RData"))
     load(paste0(pwdist_obsobs_dir, "obsobs_dist_wt.rda"))
     
     preds = left_join(
@@ -1709,12 +1711,14 @@ get_preds_batch_info = function(npreds_only, nproc = 4){
   }
 }
 
-SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_only = FALSE, predist_only = FALSE){
-  
-  runtimes = rep(NA, 6)
+SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, 
+                                      preproc_only = FALSE, predist_only = FALSE){
   
   print(paste("Loading", paste0(out_dir, "S3N_results_network", network, "_rep", rep, ".rda")))
   load(paste0(out_dir, "S3N_results_network", network, "_rep", rep, ".rda"))
+  
+  # need to do runtimes after loading because otherwise S3N runtimes overwrites the blank runtimes
+  runtimes = rep(NA, 6)
   
   tic("Build LSN"); start_time = Sys.time()
   edges <- lines_to_lsn(
@@ -1727,6 +1731,9 @@ SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_o
   )
   toc(); stop_time = Sys.time()
   runtimes[1] = as.numeric(difftime(stop_time, start_time), units="secs")
+  
+  print("After runtime[1]")
+  print(runtimes)
   
   tic("Stream updist and AFV"); start_time = Sys.time()
   edges <- updist_edges(
@@ -1745,6 +1752,9 @@ SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_o
   )
   toc(); stop_time = Sys.time()
   runtimes[2] = as.numeric(difftime(stop_time, start_time), units="secs")
+  
+  print("After runtime[2]")
+  print(runtimes)
   
   # add obs to LSN, compute updist and AFV
   tic("Add obs to LSN"); start_time = Sys.time()
@@ -1775,6 +1785,9 @@ SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_o
   )
   toc(); stop_time = Sys.time()
   runtimes[3] = as.numeric(difftime(stop_time, start_time), units="secs")
+  
+  print("After runtime[3]")
+  print(runtimes)
   
   # tic("Obs preds updist and AFV"); start_time = Sys.time()
   # site.list <- updist_sites(
@@ -1812,6 +1825,9 @@ SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_o
   toc(); stop_time = Sys.time()
   runtimes[4] = as.numeric(difftime(stop_time, start_time), units="secs")
   
+  print("After runtime[4]")
+  print(runtimes)
+  
   # tic("Assemble SSN with both obs and preds"); start_time = Sys.time()
   # ssntoy <- ssn_assemble(
   #   edges = edges,
@@ -1842,7 +1858,7 @@ SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_o
   }
   
   # if not preprocessing only, then also run estimation
-  if(!preproc_only){
+  if(!predist_only & !preproc_only){
     tic("Estimation"); start_time = Sys.time()
     ssn_mod <- ssn_lm(
       formula = DensityPer100m ~ Elevation,
@@ -1868,6 +1884,7 @@ SSN_preproc_and_estimation = function(network, rep, out_dir, lsn.path, preproc_o
          file = paste0(out_dir, "SSN_results_network", network, "_rep", rep, ".rda"))
     
   } else{
+    print(runtimes)
     save(runtimes,
          file = paste0(out_dir, "SSN_results_network", network, "_rep", rep, ".rda"))
   }
@@ -2150,7 +2167,12 @@ combine_runtimes_onemodel = function(bench_res_dir, network, nreps, model, obs_o
                      "Add preds to LSN", "Obs preds updist", "Obs preds AFV", 
                      "Assemble SSN with preds", "Obs preds distmat", "Estimation with preds")
     }
-    if(model == "SSN" & obs_only){
+    if(model == "SSN" & obs_only & !predist_only){
+      stats$task = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
+                     "Obs updist", "Sites AFV", 
+                     "Assemble SSN", "Obs distmat", "Estimation")
+    }
+    if(model == "SSN" & obs_only & predist_only){
       stats$task = c("Build LSN", "Stream updist", "Stream AFV", "Add obs to LSN", 
                      "Obs updist", "Sites AFV", 
                      "Assemble SSN", "Obs distmat", "Estimation")
