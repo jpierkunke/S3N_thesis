@@ -181,28 +181,73 @@ toc() # Add obs to LSN: 21.916 sec elapsed
 # system(paste('cd pwdists; ./scripts/combine_pred_neighbors.sh', args))
 # toc() # Preds-obs distances: sec elapsed
 
-# Prepare for estimation and prediction: generate data by species ---------------
+# Prepare for estimation and prediction -----------------------------------
 
-# this is the old code I used for the first Region 5 results
-count_each_species_in_fish(
-  fish, out_dir = fish_path, 
-  filename = "nobs_by_species_Region05.csv"
+# do this once for Region 5, not once per species
+
+# add covariates to preds and obs and save to file
+load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data_Region5.RData"))
+# names(preds); names(obs) # they're the same
+# # [1] "ptID"      "COMID"     "networkID" "binaryID"  "up_dist"   "log_AFV"   "geometry" 
+# names(streams) # 44 variables
+
+# add covariates to preds
+preds = left_join(
+  preds,
+  streams %>%
+    st_drop_geometry() %>%
+    data.frame() %>%
+    select(ptID, Development, Agriculture, Elevation, Water_Area, 
+           Ann_Runoff, Baseflow, Ann_Temp, Hydro_Alter, Fldplain_Dis),
+  by="ptID"
 )
-# 309 species
-# nobs_by_species %>% filter(nCOMIDs > 15) # 202 species left
 
-# how about we make predictions for all species with (non-zero) obs in at least 
-# as many COMIDs as the number of neighbors we're using?
-# in a sense, they all have obs at all the COMIDs, since the surveyers count 
-# all the fish they find and fish that are not recorded were not observed at 
-# that time and place, but I mean non-zero observations
-# species_for_prediction = filter(nobs_by_species, nCOMIDs > 15)$Common_Name
-
-get_obs_layer_for_each_species(
-  fish, 
-  out_dir = paste0(fish_path, "individual_species/"), 
-  region = "Region05"
+# add covariates to obs
+obs = left_join(
+  obs,
+  streams %>%
+    st_drop_geometry() %>%
+    data.frame() %>%
+    select(ptID, Development, Agriculture, Elevation, Water_Area, 
+           Ann_Runoff, Baseflow, Ann_Temp, Hydro_Alter, Fldplain_Dis),
+  by="ptID"
 )
+
+# add to fish
+load(paste0(fish_path, "combined_fish_data_starting_1990.RData"))
+fish_region5 = fish %>%
+  filter(COMID %in% preds$COMID) %>%
+  left_join(streams %>% st_drop_geometry() %>% select(COMID, LENGTHKM)) %>%
+  compute_fish_reach_count_from_density()
+
+# table(fish_region5$Source)
+# FishScales GiamOlden16 
+# 164645        7533 
+
+save(preds, obs, fish_region5, 
+     file = paste0(pwdist_input_dir, "preds_obs_fish_for_estimation.RData"))
+
+
+# # this is the old code I used for the first Region 5 results
+# count_each_species_in_fish(
+#   fish, out_dir = fish_path, 
+#   filename = "nobs_by_species_Region05.csv"
+# )
+# # 309 species
+# # nobs_by_species %>% filter(nCOMIDs > 15) # 202 species left
+# 
+# # how about we make predictions for all species with (non-zero) obs in at least 
+# # as many COMIDs as the number of neighbors we're using?
+# # in a sense, they all have obs at all the COMIDs, since the surveyers count 
+# # all the fish they find and fish that are not recorded were not observed at 
+# # that time and place, but I mean non-zero observations
+# # species_for_prediction = filter(nobs_by_species, nCOMIDs > 15)$Common_Name
+# 
+# get_obs_layer_for_each_species(
+#   fish, 
+#   out_dir = paste0(fish_path, "individual_species/"), 
+#   region = "Region05"
+# )
 
 
 
@@ -210,49 +255,76 @@ get_obs_layer_for_each_species(
 # Estimation and prediction for each species ------------------------------------
 
 pwdist_obsobs_dir = "Region5_cluster_results/"
+pwdist_predsobs_dir = "Region5_cluster_results/"
 
-load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data.RData"))
+# needed for estimation
+# loads obsobs_dist, obsobs_wt
 load(paste0(pwdist_obsobs_dir, "obsobs_dist_wt.rda"))
-
-preds = left_join(
-  preds,
-  streams %>%
-    st_drop_geometry() %>%
-    data.frame() %>%
-    select(ptID, Elevation),
-  by="ptID"
-)
-
-obs$Elevation = preds$Elevation[1:nrow(obs)]
-
-X = obs %>%
-  st_drop_geometry() %>%
-  data.frame() %>%
-  mutate(Intercept = 1) %>%
-  select(Intercept, Elevation) %>%
-  as.matrix()
-
-obs$DensityPer100m = simulate_SSN_data(obsobs_dist, obsobs_wt, X)
-
+# loads obs_neighbors
 load(paste0(pwdist_obsobs_dir, "obs_neighbors.rda"))
+# loads preds, obs, fish_region5
+load(paste0(pwdist_input_dir, "preds_obs_pwdist_input_data_Region5.RData"))
+load(paste0(pwdist_input_dir, "preds_obs_fish_for_estimation.RData"))
+
+common_name = "Creek Chub"
+this_species = fish_region5 %>%
+  filter(Common_Name == common_name) %>%
+  select(COMID, DensityPer100m)
+
+if(nrow(this_species) != n_distinct(this_species$COMID)){
+  stop("COMID is not a unique identifier for this_species")
+}
+
+obs_this_species = obs %>%
+  left_join(this_species, by = "COMID") %>%
+  # set to 0 if NA because this species was not observed there
+  mutate(DensityPer100m = replace_na(DensityPer100m, 0))
 
 tic("Estimation"); start_time = Sys.time()
 estimation = BRISC_estimation_stream(
-  coords = as.matrix(1:nrow(obs)),
-  y = as.matrix(obs$DensityPer100m),
-  x = X,
+  coords = as.matrix(1:nrow(obs_this_species)),
+  y = as.matrix(obs_this_species$DensityPer100m),
+  x = get_X(obs_this_species),
   neighbor = obs_neighbors,
   cov.model = "exponential",
   nugget_status = 1,
   verbose = TRUE
 )
 toc(); stop_time = Sys.time()
-runtimes[5] = as.numeric(difftime(stop_time, start_time), units="secs")
+# runtimes[5] = as.numeric(difftime(stop_time, start_time), units="secs")
 
-params = c(
-  estimation$Beta, # beta (intercept, elevation)
-  estimation$Theta # sigma.sq, tau.sq, phi
+# params = c(
+#   estimation$Beta, # beta (intercept, elevation)
+#   estimation$Theta # sigma.sq, tau.sq, phi
+# )
+# params[5] = 1/params[5] # convert phi to lambda (range parameter)
+# names(params)[5] = "lambda"
+
+# save estimated parameter values, n_neighbors, species, and runtime
+
+# prediction
+# load pred_neighbors object
+load(paste0(pwdist_predsobs_dir, "pred_neighbors.rda"))
+prediction = BRISC_prediction_stream(
+  BRISC_Out = estimation,
+  coords.0 = as.matrix(1:nrow(preds)),
+  X.0 = get_X(preds),
+  # X.0 = streams %>%
+  #       st_drop_geometry() %>%
+  #       select(Elevation) %>%
+  #       # select(Elevation, Water_Area,
+  #       #        Ann_Runoff, Baseflow, Ann_Temp,
+  #       #        Development, Agriculture,
+  #       #        Hydro_Alter, Fldplain_Dis) %>%
+  #       mutate(Intercept = 1, .before = Elevation) %>%
+  #       as.matrix(),
+  neighbor = pred_neighbors,
+  obsobs_dist = obsobs_dist,
+  obsobs_wt = obsobs_wt,
+  verbose = TRUE
 )
-params[5] = 1/params[5] # convert phi to lambda (range parameter)
-names(params)[5] = "lambda"
+toc(); stop_time = Sys.time()
+# runtimes[7] = as.numeric(difftime(stop_time, start_time), units="secs")
+
+
 

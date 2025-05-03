@@ -1038,9 +1038,9 @@ combine_preds_nn_results = function(data_dir, out_dir, m, batch_size){
       cat(paste("Processing batch", i, "of", nbatches), fill = TRUE)
       load(paste0(data_dir, fn_nn[i])) # loads object called pred_neighbors
       
-      nnIndx = rbind(nnIndx, pred_neighbors$nnIndx)
-      nnDist = rbind(nnDist, pred_neighbors$nnDist)
-      nnWght = rbind(nnWght, pred_neighbors$nnWght)
+      nnIndx = c(nnIndx, pred_neighbors$nnIndx)
+      nnDist = c(nnDist, pred_neighbors$nnDist)
+      nnWght = c(nnWght, pred_neighbors$nnWght)
     }
     
     pred_neighbors = list(
@@ -1060,7 +1060,8 @@ add_obs_nns_for_prediction = function(obs_dir, out_dir, nnIndxObs, nnDistObs, nn
   load(paste0(out_dir, "pred_neighbors.rda"))
   load(paste0(obs_dir, "obsobs_nns_for_prediction.rda"))
   
-  nnIndx = c(nnIndxObs, pred_neighbors$nnIndx)
+  # nnIndxObs is 1-indexed while pred_neighbors$nnIndx is 0-indexed
+  nnIndx = c(nnIndxObs-1, pred_neighbors$nnIndx)
   nnDist = c(nnDistObs, pred_neighbors$nnDist)
   nnWght = c(nnWghtObs, pred_neighbors$nnWght)
   
@@ -2532,7 +2533,11 @@ count_each_species_in_fish = function(fish, out_dir=NULL, filename = "nobs_by_sp
   }
 }
 
-get_obs_sf = function(fish, common_name, out_dir = NULL, filename = NULL, write_to_file = TRUE){
+get_obs_sf = function(fish, 
+                      common_name, 
+                      out_dir = NULL, 
+                      filename = NULL, 
+                      write_to_file = TRUE){
   fish_stream_vars = fish %>%
     select(COMID, HUC8:binaryID) %>%
     unique()
@@ -2577,5 +2582,15 @@ get_obs_layer_for_each_species = function(fish, out_dir, region = ""){
   }
   cat("Done.", fill=TRUE)
   
+}
+
+get_X = function(obs) {
+  return(obs %>%
+           st_drop_geometry() %>%
+           data.frame() %>%
+           mutate(Intercept = 1) %>%
+           # select(Intercept, Development:Fldplain_Dis) %>%
+           select(Intercept, Elevation) %>%
+           as.matrix())
 }
 
