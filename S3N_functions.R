@@ -975,7 +975,19 @@ compute_pwdists_pred_obs = function(preds, obs, streams, m, out_dir,
     nnWghtObs = matrix(0.0, nrow = n, ncol = m)
     
     for(i in 1:n){
-      nnIndxObs[i,] = order(obsobs_dist[i,])[1:m]
+      FC_points = which(obsobs_wt[i,] > 0)
+      FC_points_sorted = FC_points[order(obsobs_dist[i, FC_points])]
+      # prioritize the FC points
+      nnIndxObs[i,] = FC_points_sorted[1:m]
+      
+      # if fewer FC points than m (desired number of nearest neighbors),
+      # then add neighbors to replace the remaining NAs
+      if(length(FC_points) < m){
+        FU_points = which(obsobs_wt[i,] == 0)
+        FU_points_sorted = FU_points[order(obsobs_dist[i, FU_points])]
+        nnIndxObs[i, (length(FC_points) + 1):m] = FU_points_sorted[1:(m-length(FC_points))]
+      }
+      
       nnDistObs[i,] = obsobs_dist[i,][nnIndxObs[i,]]
       nnWghtObs[i,] = obsobs_wt[i,][nnIndxObs[i,]]
     }
@@ -1249,136 +1261,6 @@ get_k = function(nn){
 }
 
 
-# estimation and prediction helper functions ------------------------------
-
-get_regional_estimate_for_species = function(common_name, species_path,
-                                             preds, nn.indx, nn.dists, pwdist_matrix,
-                                             nugget_status = 1, verbose = FALSE){
-  
-  # read in data for a species
-  # 8907 x 48 before adding columns for common or scientific name
-  obs = read_csv(file = paste0(species_path, str_replace(common_name, " ", "_"), "_Region05.csv"),
-                 show_col_types = FALSE) %>%
-    mutate(Common_Name = common_name) %>%
-    # added these two lines to update HAI_US and IFI_geomean with imputed values
-    select(-c(TOT_STRM_DENS, HAI_US, HAI_region, IFI_geomean)) %>%
-    left_join(region5_covars, by="COMID") %>%
-    # rename covariates
-    rename(Elevation = CAT_ELEV_MEAN,
-           Water_Area = TOT_BASIN_AREA,
-           Ann_Runoff = TOT_RUN7100,
-           Baseflow = TOT_BFI,
-           Ann_Temp = MeanAnnualTemp,
-           Hydro_Alter = HAI_US,
-           Fldplain_Dis = IFI_geomean)
-  
-  n = nrow(obs)
-  
-  # if(!identical(preds$COMID[1:n], as.integer(obs$COMID))){
-  if(!identical(preds$COMID[1:n], obs$COMID)){
-    stop("obs COMIDs are not in the correct order")
-  }
-  
-  cat("Estimating model parameters...", fill=TRUE)
-  # other arguments that could be included:
-  # sigma.sq = 1, tau.sq = 0.1, phi = 1, nu = 1.5, 
-  # search.type = "tree", stabilization = NULL,
-  # pred.stabilization = 1e-8, verbose = TRUE, 
-  # eps = 2e-05, nugget_status = 1, n_omp = 1
-  a = Sys.time()
-  estimation = BRISC_estimation_stream(
-    coords = as.matrix(1:nrow(obs)),
-    y = as.matrix(obs$DensityPer100m),
-    # use all 9 covariates AND an intercept
-    x = obs %>%
-      st_drop_geometry() %>%
-      data.frame() %>%
-      # # for three covariates:
-      # select(CAT_ELEV_MEAN, TOT_BASIN_AREA, Development) %>%
-      # # for seven covariates:
-      # select(CAT_ELEV_MEAN, TOT_BASIN_AREA, 
-      #        TOT_RUN7100, TOT_BFI, MeanAnnualTemp,
-      #        Development, Agriculture) %>%
-      # # for all 9 covariates, renamed:
-      select(Elevation, Water_Area, 
-             Ann_Runoff, Baseflow, Ann_Temp,
-             Development, Agriculture,
-             Hydro_Alter, Fldplain_Dis) %>%
-      mutate(Intercept = 1, .before = Elevation) %>%
-      as.matrix(),
-    neighbor = neighbors,
-    cov.model = "exponential",
-    nugget_status = nugget_status,
-    verbose = verbose
-  )
-  b = Sys.time()
-  estimation_time = b-a
-  cat(paste("Estimation time:", 
-            round(estimation_time, 3), 
-            units(estimation_time)), fill=TRUE)
-  
-  # prediction
-  cat("Predicting fish density across the region...", fill=TRUE)
-  a = Sys.time()
-  prediction = BRISC_prediction_stream(
-    BRISC_Out = estimation,
-    coords.0 = as.matrix(1:nrow(preds)),
-    X.0 = preds %>%
-      st_drop_geometry() %>%
-      data.frame() %>%
-      select(Elevation, Water_Area, 
-             Ann_Runoff, Baseflow, Ann_Temp,
-             Development, Agriculture,
-             Hydro_Alter, Fldplain_Dis) %>%
-      # select(CAT_ELEV_MEAN, TOT_BASIN_AREA, 
-      #        TOT_RUN7100, TOT_BFI, MeanAnnualTemp,
-      #        Development, Agriculture) %>%
-      mutate(Intercept = 1, .before = Elevation) %>%
-      as.matrix(),
-    nn.indx = nn.indx, nn.dists = nn.dists, pwdist_matrix = pwdist_matrix,
-    verbose = verbose
-  )
-  b = Sys.time()
-  prediction_time = b-a
-  cat(paste("Prediction time:", 
-            round(prediction_time, 3), 
-            units(prediction_time)), fill=TRUE)
-  
-  # scale up from prediction to estimate the Region 5 population of this species
-  # add up (100* predicted fish density * LENGTHKM) for all pred point COMIDs
-  # do same but for each HUC12 or HUC8 to get subregional estimates
-  # repeat for other species
-  # uncertainty?
-  
-  cat("Scaling up to a regional estimate...", fill=TRUE)
-  a = Sys.time()
-  preds_supp = preds %>%
-    st_drop_geometry() %>%
-    mutate(DensityPer100m_pred = prediction$prediction, Common_Name = common_name) %>%
-    # mutate(DensityPer100m_pred = ifelse(DensityPer100m_pred < 0 | DensityPer100m_pred > 10^6, NA, DensityPer100m_pred)) %>%
-    mutate(CountReachTotal_pred = 10*DensityPer100m_pred*LENGTHKM) %>%
-    select(COMID, Common_Name, DensityPer100m_pred, CountReachTotal_pred)
-  
-  # note: I need to update this to exclude negative densities
-  regional_estimate = sum(preds_supp$CountReachTotal_pred, na.rm = TRUE) # 1,150,089,774 central stoneroller in Region 5
-  b = Sys.time()
-  scaleup_time = b-a
-  cat(paste("Scale-up time:", 
-            round(scaleup_time, 3), 
-            units(scaleup_time)), fill=TRUE)
-  
-  return(list(
-    common_name = common_name,
-    obs = obs,
-    estimation = estimation,
-    prediction = prediction,
-    preds_supp = preds_supp,
-    regional_estimate = regional_estimate,
-    estimation_time = estimation_time,
-    prediction_time = prediction_time,
-    scaleup_time = scaleup_time
-  ))
-}
 
 
 # benchmarking and validation ---------------------------------------------
@@ -2511,9 +2393,112 @@ stop_quietly <- function(){
 
 # functions for Region 5 -------------
 
+get_regional_estimate_for_species = function(common_name, 
+                                             fish_region5, obs, preds,
+                                             obs_neighbors, pred_neighbors,
+                                             obsobs_dist, obsobs_wt,
+                                             nugget_status = 1, verbose = FALSE){
+  
+  n = nrow(obs)
+  
+  if(!identical(as.integer(preds$COMID[1:n]), as.integer(obs$COMID))){
+    stop("obs COMIDs do not match the first n preds COMIDs")
+  }
+  
+  this_species = fish_region5 %>%
+    filter(Common_Name == common_name) %>%
+    select(COMID, DensityPer100m)
+  
+  if(nrow(this_species) != n_distinct(this_species$COMID)){
+    stop("COMID is not a unique identifier for this_species")
+  }
+  
+  obs_this_species = obs %>%
+    left_join(this_species, by = "COMID") %>%
+    # set to 0 if NA because this species was not observed there
+    mutate(DensityPer100m = replace_na(DensityPer100m, 0))
+  
+  cat("Estimating model parameters...", fill=TRUE)
+  # other arguments that could be included:
+  # sigma.sq = 1, tau.sq = 0.1, phi = 1, nu = 1.5, 
+  # search.type = "tree", stabilization = NULL,
+  # pred.stabilization = 1e-8, verbose = TRUE, 
+  # eps = 2e-05, nugget_status = 1, n_omp = 1
+  tic("Estimation"); start_time = Sys.time()
+  estimation = BRISC_estimation_stream(
+    coords = as.matrix(1:nrow(obs_this_species)),
+    y = as.matrix(obs_this_species$DensityPer100m),
+    x = get_X(obs_this_species),
+    neighbor = obs_neighbors,
+    cov.model = "exponential",
+    nugget_status = nugget_status,
+    verbose = verbose
+  )
+  stop_time = Sys.time(); toc()
+  estimation_time = as.numeric(difftime(stop_time, start_time), units="secs")
+  
+  # beta_params = estimation$Beta # beta (intercept, elevation)
+  # theta_params = estimation$Theta # sigma.sq, tau.sq, phi
+  # theta_params["lambda"] = 1/theta_params["phi"] # convert phi to lambda (range parameter)
+  
+  # at minimum, save estimated parameter values, n_neighbors, common_name, runtime
+  
+  cat("Predicting fish density across the region...", fill=TRUE)
+  # load pred_neighbors object
+  tic("Prediction"); start_time = Sys.time()
+  prediction = BRISC_prediction_stream(
+    BRISC_Out = estimation,
+    coords.0 = as.matrix(1:nrow(preds)),
+    X.0 = get_X(preds),
+    neighbor = pred_neighbors,
+    obsobs_dist = obsobs_dist,
+    obsobs_wt = obsobs_wt,
+    verbose = verbose
+  )
+  stop_time = Sys.time(); toc()
+  prediction_time = as.numeric(difftime(stop_time, start_time), units="secs")
+  
+  # scale up from prediction to estimate the Region 5 population of this species
+  # add up (100* predicted fish density * LENGTHKM) for all pred point COMIDs
+  # do same but for each HUC12 or HUC8 to get subregional estimates
+  # repeat for other species
+  # uncertainty?
+  
+  cat("Scaling up to a regional estimate...", fill=TRUE)
+  tic("Regional estimates"); start_time = Sys.time()
+  preds_supp = preds %>%
+    st_drop_geometry() %>%
+    mutate(DensityPer100m_pred = prediction$prediction, Common_Name = common_name) %>%
+    # mutate(DensityPer100m_pred = ifelse(DensityPer100m_pred < 0 | DensityPer100m_pred > 10^6, NA, DensityPer100m_pred)) %>%
+    mutate(CountReachTotal_pred = 10*DensityPer100m_pred*LENGTHKM) %>%
+    select(COMID, Common_Name, DensityPer100m_pred, CountReachTotal_pred)
+  preds_supp$obs_density = NA
+  preds_supp$obs_density[1:n] = obs_this_species$DensityPer100m
+  
+  regional_estimate = sum(preds_supp$CountReachTotal_pred, na.rm = TRUE)
+  stop_time = Sys.time(); toc()
+  scaleup_time = as.numeric(difftime(stop_time, start_time), units="secs")
+  
+  return(list(
+    common_name = common_name,
+    estimation = estimation,
+    prediction = prediction,
+    preds_supp = preds_supp,
+    regional_estimate = regional_estimate,
+    estimation_time = estimation_time,
+    prediction_time = prediction_time,
+    scaleup_time = scaleup_time
+  ))
+}
+
 # note: each row corresponds to a unique COMID-Scientific_Name pair
 # n_distinct(fish) = n_distinct(select(fish, COMID, Scientific_Name)) = 171795 for Region 5
-count_each_species_in_fish = function(fish, out_dir=NULL, filename = "nobs_by_species.csv", write_to_file = TRUE){
+count_each_species_in_fish = function(fish, 
+                                      out_dir=NULL, 
+                                      filename = "nobs_by_species", 
+                                      write_to_csv = TRUE,
+                                      write_to_rda = TRUE,
+                                      return_obj = FALSE){
   
   # table of number of observations by species
   nobs_by_species = fish %>%
@@ -2526,9 +2511,13 @@ count_each_species_in_fish = function(fish, out_dir=NULL, filename = "nobs_by_sp
     ungroup() %>%
     arrange(desc(TotalCount))
   
-  if(write_to_file){
-    write_csv(nobs_by_species, file = paste0(out_dir, filename))
-  } else{
+  if(write_to_csv){
+    write_csv(nobs_by_species, file = paste0(out_dir, filename, ".csv"))
+  }
+  if(write_to_csv){
+    save(nobs_by_species, file = paste0(out_dir, filename, ".rda"))
+  }
+  if(return_obj){
     return(nobs_by_species)
   }
 }
@@ -2589,8 +2578,8 @@ get_X = function(obs) {
            st_drop_geometry() %>%
            data.frame() %>%
            mutate(Intercept = 1) %>%
-           # select(Intercept, Development:Fldplain_Dis) %>%
-           select(Intercept, Elevation) %>%
+           select(Intercept, Development:Fldplain_Dis) %>%
+           # select(Intercept, Elevation) %>%
            as.matrix())
 }
 
