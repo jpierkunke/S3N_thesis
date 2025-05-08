@@ -1,6 +1,6 @@
 # benchmarking and validation
 # PhD dissertation, Chapter 3
-# Jess Kunke, 2025 April
+# Jess Kunke, 2025 May
 
 # run choose_bench_networks.R before running this script
 
@@ -57,8 +57,9 @@ lsn.path = "lsn"
 
 bench_nws = data.frame(
   Network = 1:6,
-  nreps_S3N = c(50, 50, 50, 10,  2,  2),
-  nreps_SSN = c(50, 50,  5,  1,  1, NA) # for SSN network 5, do preprocessing only, no estimation
+  nreps_S3N = c(50, 50, 50, 10, 10, 10),
+  nreps_SSN = c(50, 50, 50, 10,  2, NA),
+  preproc_only = c(FALSE, FALSE, FALSE, TRUE, TRUE, TRUE)
 )
 
 
@@ -68,7 +69,8 @@ streams = filter(streams_full, HUC10 == "0514020607")
 benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[1], 
                        bench_nws$nreps_S3N[1], 
-                       bench_nws$nreps_SSN[1])
+                       bench_nws$nreps_SSN[1],
+                       bench_nws$preproc_only[1])
 
 
 ## Subnetwork 2: HUC8 containing stream outlet (1273 reaches) -------------
@@ -77,7 +79,8 @@ streams = filter(streams_full, HUC8 == "05140206")
 benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[2], 
                        bench_nws$nreps_S3N[2], 
-                       bench_nws$nreps_SSN[2])
+                       bench_nws$nreps_SSN[2],
+                       bench_nws$preproc_only[2])
 
 
 ## Subnetwork 3: HUC6 containing stream outlet (7146 reaches) -------------
@@ -86,7 +89,8 @@ streams = filter(streams_full, HUC6 == "051402")
 benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[3], 
                        bench_nws$nreps_S3N[3], 
-                       bench_nws$nreps_SSN[3])
+                       bench_nws$nreps_SSN[3],
+                       bench_nws$preproc_only[3])
 
 ## Subnetwork 4: HUC4 containing stream outlet (11540 reaches)-------------
 
@@ -94,7 +98,8 @@ streams = filter(streams_full, HUC4 == "0514")
 benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[4], 
                        bench_nws$nreps_S3N[4], 
-                       bench_nws$nreps_SSN[4])
+                       bench_nws$nreps_SSN[4],
+                       bench_nws$preproc_only[4])
 # S3N: R session takes <=2 GB memory throughout, 
 #      obs-obs distances takes 4-5 GB memory
 #      preds-obs distances takes 1-2 GB memory per batch, 4 batches (1440 pred points each)
@@ -119,7 +124,7 @@ benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[5], 
                        bench_nws$nreps_S3N[5], 
                        bench_nws$nreps_SSN[5],
-                       SSN_preproc_only = TRUE)
+                       bench_nws$preproc_only[5])
 
 
 ## Subnetwork 6: HUC2 (169092 reaches) ------------------------------------
@@ -129,6 +134,7 @@ benchmark_and_validate(streams, pred_path,
                        bench_nws$Network[6],
                        bench_nws$nreps_S3N[6], 
                        bench_nws$nreps_SSN[6],
+                       bench_nws$preproc_only[6],
                        onlyS3N = TRUE)
 beep(3)
 
@@ -137,37 +143,18 @@ beep(3)
 
 ## Summarize networks -----------------------------------------------------
 
-# for(nw in 1:6){
-#   load(paste0("bench_results/network", nw, "_initial_data.rda"))
-#   print(paste("Network", nw))
-#   print(paste("nreach", nrow(streams), "npreds", nrow(preds), "nobs", nrow(obs)))
-#   # print(paste("streams range", range(streams$COMID)))
-#   # print(paste("num of negative streams COMIDs", sum(streams$COMID < 0)))
-#   # print(paste("preds range", range(preds$COMID)))
-#   print("")
-# }
-
-# bench_nws = data.frame(
-#   Network = 1:3,
-#   nreps_S3N = c(50, 50, 50),
-#   nreps_SSN = c(50, 50, 5),
-#   nreach = c(284, 1273, 7146),
-#   npreds = c(283, 1267, 7123),
-#   nobs = c(142, 634, 3562)
-# )
-
 bench_nws = data.frame(
   Network = 1:6,
   nreach = NA,
   npreds = NA,
   nobs = NA,
   nreps_S3N = c(50, 50, 50, 10, 10, 10),
-  nreps_SSN = c(50, 50,  5, 10,  2, NA), # eventually do 50 SSN runs on network 3
+  nreps_SSN = c(50, 50, 50, 10,  2, NA), # eventually do 50 SSN runs on network 3
   preproc_only = c(FALSE, FALSE, FALSE, TRUE, TRUE, TRUE)
 )
 
 for(nw in 1:6){
-  load(paste0("bench_results_thesis/network", nw, "_initial_data.rda"))
+  load(paste0("bench_results/network", nw, "_initial_data.rda"))
   bench_nws$nreach[nw] = nrow(streams)
   bench_nws$npreds[nw] = nrow(preds)
   bench_nws$nobs[nw] = nrow(obs)
@@ -175,7 +162,7 @@ for(nw in 1:6){
 # Network nreach npreds  nobs nreps_S3N nreps_SSN preproc_only
 # 1       1    284    283   142        50        50        FALSE
 # 2       2   1273   1267   634        50        50        FALSE
-# 3       3   7146   7123  3562        50         5        FALSE
+# 3       3   7146   7123  3562        50        50        FALSE
 # 4       4  11540  11515  5758        10        10         TRUE
 # 5       5  30748  30698 10000        10         2         TRUE
 # 6       6 169092 168875 10000        10        NA         TRUE
@@ -265,7 +252,9 @@ bench3 = combine_runtimes_bothmodels(
   bench_res_dir,
   bench_nws$Network[3],
   bench_nws$nreps_S3N[3],
-  bench_nws$nreps_SSN[3])
+  bench_nws$nreps_SSN[3],
+  obs_only_S3N = FALSE,
+  obs_only_SSN = TRUE)
 bench3$obs_only
 bench3$obs_preds
 #                    task     S3N_avg    S3N_sd      SSN_avg       SSN_sd
@@ -463,24 +452,47 @@ load("../BRISC_fish/bench_res/SSN_results_network4_rep1.rda"); runtimes
 
 ## Combine and summarize validation results -------------------------------
 
+bench_res_dir = "bench_results_thesis/"
+
 valid1 = combine_params_bothmodels(bench_res_dir, 
                                    bench_nws$Network[1],
                                    bench_nws$nreps_S3N[1],
                                    bench_nws$nreps_SSN[1])
+#   |Parameter |   bias_S3N|   bias_SSN|    sd_S3N|    sd_SSN|
+#   |:---------|----------:|----------:|---------:|---------:|
+#   |beta_1    |  0.0673622|  0.0565686| 1.3474402| 1.3499650|
+#   |beta_2    | -0.0012077| -0.0011177| 0.0124137| 0.0123792|
+#   |sigma.sq  | -0.2394252| -0.2042920| 0.7769548| 0.8108830|
+#   |tau.sq    |  0.0775426|  0.1608641| 0.2443687| 0.3163467|
+#   |lambda    |  1.5051939|  1.6518596| 7.7301693| 4.9518021|
 
 valid2 = combine_params_bothmodels(bench_res_dir, 
                                    bench_nws$Network[2],
                                    bench_nws$nreps_S3N[2],
                                    bench_nws$nreps_SSN[2])
+#   |Parameter |   bias_S3N|   bias_SSN|    sd_S3N|    sd_SSN|
+#   |:---------|----------:|----------:|---------:|---------:|
+#   |beta_1    | -0.2351882| -0.2253276| 0.4234030| 0.4251077|
+#   |beta_2    |  0.0017473|  0.0016751| 0.0033948| 0.0033762|
+#   |sigma.sq  |  0.0089140| -0.0710719| 0.3778211| 0.4634365|
+#   |tau.sq    | -0.0253604|  0.0896720| 0.0968090| 0.2328690|
+#   |lambda    | -0.1518889|  0.3572424| 0.8020116| 1.6412659|
 
 valid3 = combine_params_bothmodels(bench_res_dir, 
                                    bench_nws$Network[3],
                                    bench_nws$nreps_S3N[3],
                                    bench_nws$nreps_SSN[3])
+#   |Parameter |   bias_S3N|   bias_SSN|    sd_S3N|    sd_SSN|
+#   |:---------|----------:|----------:|---------:|---------:|
+#   |beta_1    |  0.0594826|  0.0651499| 0.2366170| 0.2349273|
+#   |beta_2    | -0.0003354| -0.0003733| 0.0016183| 0.0016102|
+#   |sigma.sq  | -0.0551622| -0.0727642| 0.1720123| 0.1924396|
+#   |tau.sq    |  0.0062762|  0.0797815| 0.0500061| 0.1252996|
+#   |lambda    |  0.0169189|  0.2995400| 0.4036738| 0.6629289|
 
 
 
-## Plot benchmark networks ------------------------------------------------
+## Plot benchmark networks --------------
 
 plot_network = function(bench_res_dir, network, plot_points = FALSE){
   
@@ -705,14 +717,38 @@ benchmark_and_validate(streams, pred_path,
 # Sys.sleep(30)
 # beep(3)
 
-# Generate more SSN validation results for Network 3 (slow, takes about 30 hours)
-nreps = 50; network = 3; out_dir = "valid_results/"
-lsn.path = "lsn"
-ndigits = ceiling(log(nreps, base = 10))
-for(rep in 1:nreps){
-  message(paste("Network", network, "SSN benchmark rep", rep, "of", nreps))
-  SSN_preproc_and_estimation(network, 
-                             str_pad(rep, ndigits, side = "left", pad = "0"),
-                             # need estimation for validation results
-                             out_dir, lsn.path, preproc_only = FALSE, predist_only = FALSE)
-}
+# Generate more SSN validation results for Network 3 (20 min each rep)
+# nreps = 20; network = 3; out_dir = bench_res_dir
+# lsn.path = "lsn"
+# ndigits = ceiling(log(nreps, base = 10))
+# for(rep in 1:nreps){
+#   message(paste("Network", network, "SSN benchmark rep", rep, "of", nreps))
+#   SSN_preproc_and_estimation(network, 
+#                              str_pad(rep, ndigits, side = "left", pad = "0"),
+#                              # need estimation for validation results
+#                              out_dir, lsn.path, preproc_only = FALSE, predist_only = FALSE)
+# }; beep(3)
+# 
+# network = 3; out_dir = bench_res_dir
+# lsn.path = "lsn"
+# ndigits = ceiling(log(nreps, base = 10))
+# for(rep in 21:35){
+#   message(paste("Network", network, "SSN benchmark rep", rep, "of", 35))
+#   SSN_preproc_and_estimation(network, 
+#                              str_pad(rep, ndigits, side = "left", pad = "0"),
+#                              # need estimation for validation results
+#                              out_dir, lsn.path, preproc_only = FALSE, predist_only = FALSE)
+# }
+# beep(3)
+
+# network = 3; out_dir = bench_res_dir; nreps = 50
+# lsn.path = "lsn"
+# ndigits = ceiling(log(nreps, base = 10))
+# for(rep in 36:50){
+#   message(paste("Network", network, "SSN benchmark rep", rep, "of", 50))
+#   SSN_preproc_and_estimation(network, 
+#                              str_pad(rep, ndigits, side = "left", pad = "0"),
+#                              # need estimation for validation results
+#                              out_dir, lsn.path, preproc_only = FALSE, predist_only = FALSE)
+# }
+# beep(3)

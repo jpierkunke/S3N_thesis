@@ -19,9 +19,11 @@ execute:
 ```{r setup, include = FALSE}
 library(tidyverse)
 library(knitr)
+library(gridExtra)
 
 load("Region5_results/Region5_diagnostics.RData")
 n_species = nrow(diagnostics)
+plot_dir = "Region5_results/"
 ```
 
 ## About the covariate data
@@ -73,12 +75,35 @@ If you remember, last time I was able to get results for all but one species (ro
 ggplot(diagnostics, aes(x = estimation_time)) + 
   geom_histogram(bins = 20) +
   xlab("Estimation time (seconds)") +
+  ylab("Count") +
   theme_bw()
+
+ggsave(filename = paste0(plot_dir, "est_time.png"),
+       width = 3, height = 3, units = "in")
 
 ggplot(diagnostics, aes(x = prediction_time)) + 
   geom_histogram(bins = 20) +
   xlab("Prediction time (seconds)") +
+  ylab("Count") +
   theme_bw()
+
+ggsave(filename = paste0(plot_dir, "pred_time.png"),
+       width = 3, height = 3, units = "in")
+
+# est_time = ggplot(diagnostics, aes(x = estimation_time)) + 
+#   geom_histogram(bins = 20) +
+#   xlab("Estimation time (seconds)") +
+#   theme_bw()
+# 
+# pred_time = ggplot(diagnostics, aes(x = prediction_time)) + 
+#   geom_histogram(bins = 20) +
+#   xlab("Prediction time (seconds)") +
+#   theme_bw()
+# 
+# both = grid.arrange(est_time, pred_time, nrow = 1)
+# 
+# ggsave(both, filename = paste0(plot_dir, "est_pred_times.png"),
+#        width = 8, height = 3, units = "in")
 ```
 
 @fig-runtimes shows the distribution of estimation and prediction runtimes across species. On average, estimation and prediction for a given species took `r round(mean(diagnostics$estimation_time), 2)` seconds and `r round(mean(diagnostics$prediction_time), 2)` seconds, respectively. Total estimation and prediction time across all 309 species was `r round((sum(diagnostics$prediction_time) + sum(diagnostics$estimation_time))/3600, 2)` hours.
@@ -169,6 +194,9 @@ ggplot(diagnostics, aes(x = obs_total_count/10^6, y = pred_total_count_wherethis
   xlab("Observed total count (millions of fish)") +
   ylab("Predicted total count (millions of fish)") +
   theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "obs_v_pred_wherethisspec.png"),
+  width = 3, height = 3, units = "in")
 
 ggplot(diagnostics, aes(x = obs_total_count/10^6, y = pred_total_count_wherefishobs/10^6)) +
   geom_point() +
@@ -176,6 +204,9 @@ ggplot(diagnostics, aes(x = obs_total_count/10^6, y = pred_total_count_wherefish
   xlab("Observed total count (millions of fish)") +
   ylab("Predicted total count (millions of fish)") +
   theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "obs_v_pred_wherefishobs.png"),
+  width = 3, height = 3, units = "in")
 
 ggplot(diagnostics, aes(x = obs_total_count/10^6, y = regional_estimate/10^6)) +
   geom_point() +
@@ -183,6 +214,9 @@ ggplot(diagnostics, aes(x = obs_total_count/10^6, y = regional_estimate/10^6)) +
   xlab("Observed total count (millions of fish)") +
   ylab("Predicted total count (millions of fish)") +
   theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "obs_v_pred.png"),
+  width = 3, height = 3, units = "in")
 ```
 
 ### Negative predicted densities
@@ -267,14 +301,20 @@ ggplot(diagnostics, aes(x = median_pos)) +
 
 ggplot(diagnostics, aes(x = median_neg/median_pos)) + 
   geom_histogram(bins = 20) +
-  xlab("Ratio") +
+  labs(x = "Ratio", y = "Count") +
   theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "median_neg_pos_density_ratio.png"),
+  width = 3, height = 3, units = "in")
 
 ggplot(diagnostics, aes(y = median_neg, x = median_pos)) + 
   geom_point() +
   xlab("Median negative density") +
   ylab("Median positive density") +
   theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "median_neg_vs_pos_density.png"),
+  width = 3, height = 3, units = "in")
 ```
 
 
@@ -301,7 +341,12 @@ kable(tbl_cor_by_spec, digits = 3)
 #| layout: "[45,-10,45]"
 
 ggplot(diagnostics, aes(x = cor_obs_pred)) + 
-  geom_histogram(bins = 20)
+  geom_histogram(bins = 20) +
+  labs(x = "Correlation", y = "Count") +
+  theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "cor_by_species.png"),
+  width = 3, height = 3, units = "in")
 
 ggplot(diagnostics, aes(x = cor_obs_pred_nz)) + 
   geom_histogram(bins = 20)
@@ -328,7 +373,12 @@ kable(tbl_cor_by_site, digits = 3)
 #| fig-height: 2
 
 ggplot(data.frame(cor_density_by_site), aes(cor_density_by_site)) + 
-  geom_histogram(bins = 20)
+  geom_histogram(bins = 20) +
+  labs(x = "Correlation", y = "Count") +
+  theme_bw()
+  
+ggsave(filename = paste0(plot_dir, "cor_by_site.png"),
+  width = 3, height = 3, units = "in")
 ```
 
 <!-- ### Plots of predicted vs observed counts -->

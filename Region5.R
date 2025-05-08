@@ -13,6 +13,7 @@ library(mapview) # for visualizing spatial data
 library(tidyverse) # for efficient data manipulation
 library(shapefiles) # for read.dbf
 library(magrittr) # for the eager pipe
+library(cowplot) # for side-by-side maps with shared legend
 library(SSNbler) # to benchmark SSN preprocessing
 library(SSN2) # to benchmark SSN distances and estimation
 library(BRISC) # version of BRISC I modified to handle S3N estimation and prediction
@@ -152,7 +153,7 @@ tic("Add obs to LSN")
 # load preprocessed fish data
 # read_fish_data(fish_path, with_cutoff_year = TRUE) # preprocessing took 281.165 sec
 load(paste0(fish_path, "combined_fish_data_starting_1990.RData"))
-# prep_to_compute_pwdist_region5 accomplished several tasks:
+# prep_to_compute_pwdist_region5 accomplishes several tasks:
 # - reads in and preprocess prediction points layer, add updist and AFV
 # - joins geometry, updist and AFV from pred points layer to fish dataset and
 #   selects only unique points to create the obs points layer
@@ -346,39 +347,9 @@ beep(3)
 
 # Diagnostics ----------------------
 
-plot_pred_density_map = function(streams, preds_supp, common_name, out_dir){
-  usa <- st_as_sf(maps::map("state", fill=TRUE, plot=FALSE)) %>%
-    st_transform(crs = st_crs(streams))
-  
-  streams = streams %>%
-    left_join(select(preds_supp, COMID, DensityPer100m_pred), by="COMID") %>%
-    mutate(DensityPer100m_pred = ifelse(DensityPer100m_pred < 0, 0.00001, DensityPer100m_pred))
-  
-  print(summary(streams$DensityPer100m_pred))
-  
-  # plot of Subnetwork 6 with Subnetwork 5 highlighted in colors
-  ggplot() +
-    geom_sf(data = usa,
-            color = "#2b2b2b",
-            fill = "white") +
-    geom_sf(data = st_simplify(streams,
-                               preserveTopology = FALSE,
-                               dTolerance = 1000),
-            aes(color = DensityPer100m_pred), linewidth = 0.3) +
-    # scale_color_gradient(trans = 'log') +
-    scale_color_continuous(breaks=quantile(streams$DensityPer100m_pred)) +
-    coord_sf(xlim = c(-90, -75),
-             ylim = c(35, 45),
-             default_crs = sf::st_crs(4326)) +
-    labs(title = common_name) +
-    ggthemes::theme_map() +
-    theme(legend.position = "right")
-  
-  ggsave(filename = paste0(out_dir, "Region5_pred_density_map_", str_replace_all(common_name, " ", "_"), ".png"),
-         width = 4, height = 4, units = "in")
-}
-
-
+p1 = plot_pred_density_map(streams, results_by_species$`Brook Trout`$preds_supp, "Brook Trout", "Region5_results/")
+p2 = plot_pred_density_map(streams, results_by_species$`Mud Darter`$preds_supp, "Mud Darter", "Region5_results/")
+combine_two_plots(p1, p2, "Brook Trout", "Mud Darter", "Region5_results/")
 
 # - update total counts to look at density less than or equal to -1 and 
 #   median neg/median pos density
