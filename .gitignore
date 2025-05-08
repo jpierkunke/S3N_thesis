@@ -12,3 +12,8 @@ pwdists/R_outfiles/*
 bench_results/*
 lsn/*
 validateS3N.ssn/*
+Region5_results/*
+Region5_cluster_results/*
+*.pdf
+bench_results_thesis/*
+extras/*
